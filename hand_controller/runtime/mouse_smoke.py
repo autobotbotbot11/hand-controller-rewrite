@@ -3,23 +3,18 @@ from __future__ import annotations
 import time
 
 from ..config.settings import AppConfig
-from ..controllers import MouseController, execute_actions, get_screen_size
-from ..gestures import MouseClickGestureState, MouseClickDetector, is_palm_facing_thumb_pinky
-from ..ml import MLPrediction, MLPredictor, MLControlAdapter
-from ..runtime.state import RuntimeState
+from ..controllers import get_screen_size
+from ..controllers.keyboard_controller import KeyboardUpdate
+from ..gestures import MouseClickGestureState, is_palm_facing_thumb_pinky
+from ..ml import MLPrediction
+from ..runtime.control_engine import LiveControlEngine
+from ..runtime.state import Mode, RuntimeState
 from ..vision.camera import Camera
-from ..vision.hand_selector import HandSelector
 from ..vision.hand_tracker import HandTracker
 from ..vision.models import DetectedHand, SelectedHands, VisionResult
 
 
-MOVEMENT_ANCHOR_IDX = 5
 VISUAL_CURSOR_IDX = 8
-
-
-def _movement_anchor_norm(hand: DetectedHand) -> tuple[float, float]:
-    point = hand.landmark(MOVEMENT_ANCHOR_IDX)
-    return point.x, point.y
 
 
 def _visual_cursor_px(hand: DetectedHand, frame_width: int, frame_height: int) -> tuple[int, int]:
@@ -28,11 +23,53 @@ def _visual_cursor_px(hand: DetectedHand, frame_width: int, frame_height: int) -
 
 
 def _anchor_px(hand: DetectedHand, frame_width: int, frame_height: int) -> tuple[int, int]:
-    point = hand.landmark(MOVEMENT_ANCHOR_IDX)
+    point = hand.landmark(5)
     return int(point.x * frame_width), int(point.y * frame_height)
 
 
-def _draw_mouse_smoke(
+def _draw_keyboard_overlay(frame_bgr, *, keyboard_update: KeyboardUpdate, control_enabled: bool) -> None:
+    import cv2
+
+    for key in keyboard_update.layout:
+        hovered = key.label in keyboard_update.highlight_labels
+        fill = (40, 60, 90) if not hovered else (0, 155, 255)
+        if not control_enabled:
+            fill = (35, 35, 35)
+        border = (255, 255, 255) if hovered else (120, 120, 120)
+        cv2.rectangle(frame_bgr, (key.x1, key.y1), (key.x2, key.y2), fill, -1)
+        cv2.rectangle(frame_bgr, (key.x1, key.y1), (key.x2, key.y2), border, 2)
+
+        label = "SPC" if key.label == "SPACE" else key.label
+        text_scale = 0.7 if len(label) == 1 else 0.55
+        text_size, _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, text_scale, 2)
+        text_x = key.x1 + max(8, ((key.x2 - key.x1) - text_size[0]) // 2)
+        text_y = key.y1 + max(text_size[1] + 6, ((key.y2 - key.y1) + text_size[1]) // 2)
+        cv2.putText(
+            frame_bgr,
+            label,
+            (text_x, text_y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            text_scale,
+            (255, 255, 255),
+            2,
+            cv2.LINE_AA,
+        )
+
+    for pointer in keyboard_update.pointers:
+        cv2.circle(frame_bgr, (pointer.x, pointer.y), 12, (80, 255, 80), 2)
+        cv2.putText(
+            frame_bgr,
+            pointer.hand_label,
+            (pointer.x + 12, pointer.y - 8),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (80, 255, 80),
+            2,
+            cv2.LINE_AA,
+        )
+
+
+def _draw_control_smoke(
     frame_bgr,
     *,
     vision: VisionResult,
@@ -49,6 +86,8 @@ def _draw_mouse_smoke(
     ml_status: str,
     ml_available: bool,
     ml_reason: str | None,
+    mode_toggle_status: str,
+    keyboard_update: KeyboardUpdate,
 ) -> None:
     import cv2
 
@@ -87,7 +126,7 @@ def _draw_mouse_smoke(
             cv2.LINE_AA,
         )
 
-    if selected.primary is not None:
+    if runtime_state.mode == Mode.MOUSE and selected.primary is not None:
         anchor_x, anchor_y = _anchor_px(selected.primary, width, height)
         cursor_x, cursor_y = _visual_cursor_px(selected.primary, width, height)
         cv2.circle(frame_bgr, (anchor_x, anchor_y), 10, (0, 140, 255), 2)
@@ -101,6 +140,13 @@ def _draw_mouse_smoke(
             (0, 140, 255),
             2,
             cv2.LINE_AA,
+        )
+
+    if runtime_state.mode == Mode.KEYBOARD:
+        _draw_keyboard_overlay(
+            frame_bgr,
+            keyboard_update=keyboard_update,
+            control_enabled=runtime_state.control_enabled,
         )
 
     pinch_line = "pinch idx={idx} {idx_dist:.1f}px  mid={mid} {mid_dist:.1f}px".format(
@@ -120,26 +166,39 @@ def _draw_mouse_smoke(
         cv2.LINE_AA,
     )
 
-    status_line = "  ".join(
-        [
-            f"hands={len(vision.hands)}",
-            f"active={selected.primary.label if selected.primary else '-'}",
-            f"control={'on' if runtime_state.control_enabled else 'off'}",
+    common_parts = [
+        f"hands={len(vision.hands)}",
+        f"active={selected.primary.label if selected.primary else '-'}",
+        f"mode={runtime_state.mode.value}",
+        f"control={'on' if runtime_state.control_enabled else 'off'}",
+    ]
+    if runtime_state.mode == Mode.MOUSE:
+        status_parts = [
+            *common_parts,
             f"hold={'yes' if runtime_state.hold_active else 'no'}",
             f"clicks={'on' if runtime_state.control_enabled and not runtime_state.hold_active else 'off'}",
             f"movement={'on' if movement_enabled else 'off'}",
             f"freeze={'yes' if click_freeze else 'no'}",
             f"drag={'yes' if drag_active else 'no'}",
             movement_status,
+            mode_toggle_status,
             "press q to quit",
         ]
-    )
+    else:
+        status_parts = [
+            *common_parts,
+            f"shift={'on' if keyboard_update.shift_armed else 'off'}",
+            keyboard_update.status,
+            mode_toggle_status,
+            "press q to quit",
+        ]
+
     cv2.putText(
         frame_bgr,
-        status_line,
+        "  ".join(status_parts),
         (16, 32),
         cv2.FONT_HERSHEY_SIMPLEX,
-        0.7,
+        0.65,
         (255, 255, 255),
         2,
         cv2.LINE_AA,
@@ -159,7 +218,7 @@ def _draw_mouse_smoke(
         ml_line,
         (16, 60),
         cv2.FONT_HERSHEY_SIMPLEX,
-        0.62,
+        0.60,
         (255, 255, 255),
         2,
         cv2.LINE_AA,
@@ -181,16 +240,7 @@ def run_mouse_smoke(config: AppConfig) -> None:
     import cv2
 
     screen_w, screen_h = get_screen_size()
-    controller = MouseController(
-        screen_w=screen_w,
-        screen_h=screen_h,
-        motion_settings=config.mouse_motion,
-        click_settings=config.mouse_click,
-    )
-    click_detector = MouseClickDetector(config.mouse_click)
-    runtime_state = RuntimeState()
-    ml_predictor, ml_reason = MLPredictor.try_create(config.ml)
-    ml_adapter = MLControlAdapter(config.ml)
+    engine = LiveControlEngine(config, screen_width=screen_w, screen_height=screen_h)
 
     with Camera(
         index=config.camera.index,
@@ -201,12 +251,10 @@ def run_mouse_smoke(config: AppConfig) -> None:
         min_detection_confidence=config.tracker.min_detection_confidence,
         min_tracking_confidence=config.tracker.min_tracking_confidence,
     ) as tracker:
-        selector = HandSelector(config.selector)
-
         if not camera.is_opened():
             raise RuntimeError("Unable to open the configured camera.")
 
-        window_name = "Hand Controller Rewrite - Phase 6 Mouse Smoke"
+        window_name = "Hand Controller Rewrite - Phase 8 Control Smoke"
 
         while True:
             ok, frame_bgr = camera.read()
@@ -217,73 +265,33 @@ def run_mouse_smoke(config: AppConfig) -> None:
                 frame_bgr = cv2.flip(frame_bgr, 1)
 
             vision = tracker.track_bgr_frame(frame_bgr)
-            selected = selector.select(vision.hands, vision.frame_width, vision.frame_height)
-            active_hand = selected.primary
-            palm_facing = (
-                is_palm_facing_thumb_pinky(active_hand, mirrored_input=config.tracker.mirror_input)
-                if active_hand is not None
-                else False
-            )
-            anchor_norm = _movement_anchor_norm(active_hand) if active_hand is not None else None
-            runtime_state.active_hand_label = active_hand.label if active_hand is not None else None
-            runtime_state.palm_facing = palm_facing
             now = time.time()
-
-            if ml_predictor is not None:
-                ml_prediction = ml_predictor.predict(active_hand)
-            else:
-                ml_prediction = MLPrediction(available=False, reason=ml_reason)
-            ml_update = ml_adapter.update(ml_prediction, runtime_state, now)
-            click_enabled = runtime_state.control_enabled and not runtime_state.hold_active
-            if click_enabled:
-                click_state = click_detector.analyze(
-                    active_hand=active_hand,
-                    frame_width=vision.frame_width,
-                    frame_height=vision.frame_height,
-                )
-            else:
-                click_detector.reset()
-                click_state = MouseClickGestureState()
-            movement_enabled = (
-                active_hand is not None
-                and palm_facing
-                and runtime_state.control_enabled
-                and not runtime_state.hold_active
-            )
-            runtime_state.movement_frozen = not movement_enabled
-
-            actions, movement_status = controller.update(
-                anchor_norm=anchor_norm,
-                control_enabled=runtime_state.control_enabled,
-                movement_allowed=movement_enabled,
-                click_enabled=click_enabled,
-                click_state=click_state,
+            frame_result = engine.process_frame(
+                vision,
+                layout_width=vision.frame_width,
+                layout_height=vision.frame_height,
                 now=now,
-            )
-            execute_actions([*ml_update.actions, *actions])
-            click_freeze = click_enabled and (
-                click_state.right_pressed or (
-                click_state.left_pressed and not controller.state.drag_active
-                )
             )
 
             debug_frame = frame_bgr.copy()
-            _draw_mouse_smoke(
+            _draw_control_smoke(
                 debug_frame,
-                vision=vision,
+                vision=frame_result.vision,
                 tracker=tracker,
-                selected=selected,
+                selected=frame_result.selected,
                 mirrored_input=config.tracker.mirror_input,
-                movement_status=movement_status,
-                movement_enabled=movement_enabled,
-                click_state=click_state,
-                click_freeze=click_freeze,
-                drag_active=controller.state.drag_active,
-                runtime_state=runtime_state,
-                ml_prediction=ml_prediction,
-                ml_status=ml_update.status,
-                ml_available=ml_predictor is not None,
-                ml_reason=ml_reason,
+                movement_status=frame_result.movement_status,
+                movement_enabled=frame_result.movement_enabled,
+                click_state=frame_result.click_state,
+                click_freeze=frame_result.click_freeze,
+                drag_active=frame_result.drag_active,
+                runtime_state=frame_result.runtime_state,
+                ml_prediction=frame_result.ml_prediction,
+                ml_status=frame_result.ml_status,
+                ml_available=frame_result.ml_available,
+                ml_reason=frame_result.ml_reason,
+                mode_toggle_status=frame_result.mode_toggle_status,
+                keyboard_update=frame_result.keyboard_update,
             )
 
             cv2.imshow(window_name, debug_frame)

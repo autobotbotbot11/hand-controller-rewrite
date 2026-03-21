@@ -77,6 +77,8 @@ These labels may still be predicted by the existing model, but they will not dri
 - Keyboard mode uses the cleaner codebase 1 behavior:
   - pointer hovers over a key
   - thumb-index pinch confirms a key press
+  - thumb-middle pinch sends backspace
+  - thumb-pinky pinch arms one-shot shift for the next letter key press
 
 ## Mouse mode rules
 - Mouse mode only produces actions when `control_enabled` is `True`.

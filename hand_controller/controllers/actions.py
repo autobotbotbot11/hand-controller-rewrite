@@ -31,8 +31,13 @@ class Hotkey:
 
 
 @dataclass(frozen=True, slots=True)
+class KeyPress:
+    key: str
+
+
+@dataclass(frozen=True, slots=True)
 class DoubleClick:
     button: Literal["left"] = "left"
 
 
-Action = Union[MoveRelative, Click, MouseDown, MouseUp, Hotkey, DoubleClick]
+Action = Union[MoveRelative, Click, MouseDown, MouseUp, Hotkey, KeyPress, DoubleClick]

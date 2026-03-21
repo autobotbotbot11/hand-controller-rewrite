@@ -12,9 +12,9 @@ This rewrite keeps the code modular and intentionally separates perception, deci
 - `hand_controller/ml/`
   - model loading, label normalization, and MLP adapter
 - `hand_controller/gestures/`
-  - rule-based gesture utilities
+  - rule-based gesture utilities and pinch detectors
 - `hand_controller/controllers/`
-  - mouse controller, keyboard controller, control-state controller
+  - mouse controller, keyboard controller, and mode/control-state controllers
 - `hand_controller/runtime/`
   - runtime state and the frame-by-frame orchestration loop
 - `hand_controller/ui/`
@@ -52,6 +52,7 @@ Key ideas to port:
 - `mode` is toggled by rule-based thumb-ring pinch.
 - Mouse clicks remain rule-based.
 - `hold` is mapped to clutch, not Alt+Tab.
+- Keyboard mode is toggled by a rule-based thumb-ring hold and typed with rule-based pinch events.
 
 ## Initial scope
 - Mouse mode

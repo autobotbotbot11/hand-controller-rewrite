@@ -17,7 +17,7 @@ def build_boot_message(config: AppConfig, state: RuntimeState) -> str:
             f"control_enabled={state.control_enabled}",
             f"tuning={config.tuning_path or 'defaults'}",
             f"ml_enabled={config.ml.enabled}",
-            "status=phase-6-ready",
+            "status=phase-k6-ready",
         ]
     )
 
@@ -32,7 +32,22 @@ def main() -> None:
     parser.add_argument(
         "--mouse-smoke",
         action="store_true",
-        help="Run the Phase 6 mouse smoke test with movement, clicks, and ML command integration.",
+        help="Run the live control smoke test with mouse, keyboard, and ML command integration.",
+    )
+    parser.add_argument(
+        "--control-smoke",
+        action="store_true",
+        help="Alias for --mouse-smoke.",
+    )
+    parser.add_argument(
+        "--ui-smoke",
+        action="store_true",
+        help="Run the Phase K1 control-panel + transparent-overlay smoke test.",
+    )
+    parser.add_argument(
+        "--ui-live",
+        action="store_true",
+        help="Run the live control panel + transparent-overlay path with the real CV worker.",
     )
     parser.add_argument(
         "--tuning",
@@ -51,7 +66,7 @@ def main() -> None:
         run_vision_smoke(config)
         return
 
-    if args.mouse_smoke:
+    if args.mouse_smoke or args.control_smoke:
         from .runtime.mouse_smoke import run_mouse_smoke
 
         print(build_boot_message(config, state))
@@ -59,8 +74,22 @@ def main() -> None:
         run_mouse_smoke(config)
         return
 
+    if args.ui_smoke:
+        from .runtime.ui_foundation_smoke import run_ui_foundation_smoke
+
+        print(build_boot_message(config, state))
+        run_ui_foundation_smoke(config)
+        return
+
+    if args.ui_live:
+        from .runtime.ui_live_control import run_ui_live_control
+
+        print(build_boot_message(config, state))
+        run_ui_live_control(config)
+        return
+
     print(build_boot_message(config, state))
-    print("hint=run with --vision-smoke or --mouse-smoke for live testing")
+    print("hint=run with --vision-smoke, --control-smoke, --ui-smoke, or --ui-live for live testing")
 
 
 if __name__ == "__main__":

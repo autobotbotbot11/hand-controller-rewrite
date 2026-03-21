@@ -52,6 +52,56 @@ class MouseClickConfig:
 
 
 @dataclass(slots=True, frozen=True)
+class KeyboardConfig:
+    height_ratio: float = 0.36
+    side_margin_px: int = 20
+    bottom_margin_px: int = 20
+    key_gap_px: int = 6
+    row_gap_px: int = 6
+    layout_rows: tuple[tuple[str, ...], ...] = field(
+        default_factory=lambda: (
+            ("ESC", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "BACKSPACE"),
+            ("TAB", "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"),
+            ("A", "S", "D", "F", "G", "H", "J", "K", "L", "SEMICOLON", "APOSTROPHE", "ENTER"),
+            ("SHIFT", "Z", "X", "C", "V", "B", "N", "M", "COMMA", "PERIOD", "SLASH"),
+            ("SPACE", "MINUS", "UNDERSCORE", "QUESTION", "EXCLAMATION", "LPAREN", "RPAREN", "BACKSLASH"),
+        )
+    )
+    key_width_units: dict[str, float] = field(
+        default_factory=lambda: {
+            "ESC": 1.20,
+            "BACKSPACE": 1.90,
+            "TAB": 1.40,
+            "ENTER": 1.80,
+            "SHIFT": 1.80,
+            "SPACE": 4.60,
+            "MINUS": 1.10,
+            "UNDERSCORE": 1.10,
+            "QUESTION": 1.10,
+            "EXCLAMATION": 1.10,
+            "LPAREN": 1.10,
+            "RPAREN": 1.10,
+            "BACKSLASH": 1.10,
+        }
+    )
+    index_pinch_threshold_px: float = 35.0
+    index_press_multiplier: float = 0.72
+    index_release_multiplier: float = 1.02
+    middle_pinch_threshold_px: float = 46.0
+    middle_press_multiplier: float = 0.88
+    middle_release_multiplier: float = 1.12
+    ring_pinch_threshold_px: float = 42.0
+    ring_press_multiplier: float = 0.84
+    ring_release_multiplier: float = 1.10
+    pinky_pinch_threshold_px: float = 52.0
+    pinky_press_multiplier: float = 0.92
+    pinky_release_multiplier: float = 1.14
+    mode_toggle_hold_seconds: float = 0.35
+    mode_toggle_cooldown_seconds: float = 0.80
+    require_palm_facing_for_toggle: bool = True
+
+
+@dataclass(slots=True, frozen=True)
 class HandTrackerConfig:
     max_num_hands: int = 2
     min_detection_confidence: float = 0.7
@@ -106,6 +156,7 @@ class AppConfig:
     selector: HandSelectorConfig
     mouse_motion: MouseMotionConfig
     mouse_click: MouseClickConfig
+    keyboard: KeyboardConfig
     ml: MLConfig
     tuning_path: str | None = None
 
@@ -141,6 +192,7 @@ def _merge_config(base: AppConfig, overrides: dict[str, Any], tuning_path: str |
     selector = base.selector
     mouse_motion = base.mouse_motion
     mouse_click = base.mouse_click
+    keyboard = base.keyboard
     ml = base.ml
 
     section_map = {
@@ -149,6 +201,7 @@ def _merge_config(base: AppConfig, overrides: dict[str, Any], tuning_path: str |
         "selector": selector,
         "mouse_motion": mouse_motion,
         "mouse_click": mouse_click,
+        "keyboard": keyboard,
         "ml": ml,
     }
 
@@ -171,6 +224,7 @@ def _merge_config(base: AppConfig, overrides: dict[str, Any], tuning_path: str |
         selector=section_map["selector"],
         mouse_motion=section_map["mouse_motion"],
         mouse_click=section_map["mouse_click"],
+        keyboard=section_map["keyboard"],
         ml=section_map["ml"],
         tuning_path=tuning_path,
     )
@@ -184,6 +238,7 @@ def build_default_config(tuning_path: str | Path | None = None) -> AppConfig:
         selector=HandSelectorConfig(),
         mouse_motion=MouseMotionConfig(),
         mouse_click=MouseClickConfig(),
+        keyboard=KeyboardConfig(),
         ml=MLConfig(),
         tuning_path=None,
     )
@@ -195,6 +250,7 @@ def tuning_snapshot(config: AppConfig) -> dict[str, Any]:
     return {
         "tuning_path": config.tuning_path,
         "mouse_click": asdict(config.mouse_click),
+        "keyboard": asdict(config.keyboard),
         "mouse_motion": asdict(config.mouse_motion),
         "ml": {
             "enabled": config.ml.enabled,

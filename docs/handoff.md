@@ -58,6 +58,10 @@ These decisions are intentional and should not be changed casually.
 - Keyboard logic should follow the better design from `hand_controller`.
 - Keyboard toggle is rule-based thumb-ring pinch.
 - Do not use the two-hand idle keyboard activation logic from `touch-v15`.
+- Keyboard mode includes:
+  - thumb-index pinch to type hovered key
+  - thumb-middle pinch for backspace
+  - thumb-pinky pinch for one-shot Shift
 
 ### Undo / Redo
 - Keep both in the rewrite.
@@ -130,18 +134,35 @@ Completed:
 - Phase 4 validated on the user's machine: stable mouse movement is smooth and usable
 - Phase 5 click/drag refactor code: release-based left tap, easier double-click path, down-triggered right click, hold-to-drag, JSON tuning overrides, and updated `--mouse-smoke`
 - Phase 6 baseline code: MLP predictor, action adapter, fallback artifact lookup to `touch-v15`, and integrated `toggle` / `hold` / `undo` / `redo` in `--mouse-smoke`
+- Phase 8 baseline code: rule-based thumb-ring keyboard mode toggle, keyboard overlay, pinch-to-type keypresses, backspace gesture, one-shot Shift gesture, and integrated control smoke runner
+- Phase K1 foundation code: `ui/main_window.py`, `ui/overlay_window.py`, `ui/signals.py`, typed overlay payloads, and `--ui-smoke` for validating the Qt overlay architecture
+- Phase K2/K3 baseline code: `runtime/ui_live_control.py` and `--ui-live` now run the real CV worker through the Qt control panel + transparent overlay path
+- Phase K4 baseline code: `controllers/keyboard_controller.py` now builds a data-driven full keyboard layout with a complete practical key set and configurable row/size/width settings
+- Phase K6 cleanup code: `runtime/control_engine.py` now centralizes mouse mode, keyboard mode, ML updates, and transition cleanup so both `--control-smoke` and `--ui-live` share the same behavior
 - Current Phase 6 behavior uses configurable ML settings under the `ml` section of the tuning JSON files.
 
 Repo-local source of truth:
 - `docs/gesture-spec.md`
 - `docs/architecture.md`
 - `docs/phase-plan.md`
+- `docs/keyboard-v1-design.md`
+- `docs/keyboard-v1-implementation-plan.md`
 
 Current package files:
 - `hand_controller/app.py`
 - `hand_controller/config/settings.py`
 - `hand_controller/runtime/state.py`
+- `hand_controller/runtime/control_engine.py`
 - `hand_controller/ml/labels.py`
+- `hand_controller/controllers/keyboard_controller.py`
+- `hand_controller/controllers/mode_toggle.py`
+- `hand_controller/gestures/hand_pinches.py`
+- `hand_controller/ui/main_window.py`
+- `hand_controller/ui/overlay_window.py`
+- `hand_controller/ui/payloads.py`
+- `hand_controller/ui/signals.py`
+- `hand_controller/runtime/ui_foundation_smoke.py`
+- `hand_controller/runtime/ui_live_control.py`
 
 Smoke tests already passed:
 - `python -m compileall hand_controller`
@@ -151,8 +172,24 @@ Smoke tests already passed:
 ## Next exact phase
 
 Current validation task:
+- install `requirements-later.txt` if PyQt5 is not present yet
+- run `python -m hand_controller --ui-smoke`
+- confirm the control panel window opens
+- click Start and confirm the transparent fullscreen overlay opens
+- confirm Stop closes the overlay cleanly
+- confirm closing the control panel also shuts down the overlay/worker cleanly
+- confirm the overlay can render mock keyboard rectangles, pointers, and skeleton lines
+- run `python -m hand_controller --ui-live --tuning .\\tuning.local.json`
+- confirm the real camera/MediaPipe loop starts from the control panel window
+- confirm mouse mode still works while using the Qt overlay path
+- confirm keyboard mode renders the full data-driven keyboard on the transparent overlay instead of the OpenCV window
+- confirm live skeleton lines, pointer markers, selfie preview, and status text appear on the overlay
+- confirm the full practical key set is present and usable on the overlay
+- confirm layout sizing and spacing remain sensible on the user's display
+- confirm mouse <-> keyboard transitions feel stable in both `--control-smoke` and `--ui-live`
+- confirm switching modes does not leave stale drag/click state behind
 - install `requirements-later.txt` if ML dependencies are not present yet
-- run `python -m hand_controller --mouse-smoke`
+- run `python -m hand_controller --control-smoke`
 - confirm left click via quick thumb-index pinch-and-release
 - confirm right click via thumb-middle pinch down
 - confirm two quick left tap cycles feel easier than before
@@ -160,11 +197,16 @@ Current validation task:
 - confirm cursor freezes before drag starts, not for the entire drag
 - adjust `tuning.local.json` if the click feel still needs experimentation
 - confirm `toggle` can turn control off and on again while the preview keeps running
-- confirm `hold` freezes movement only
+- confirm `toggle` requires a short sustained hold before firing
+- confirm `hold` freezes movement and blocks clicks
 - confirm `undo` and `redo` hotkeys fire once per gesture
+- confirm thumb-ring hold toggles into keyboard mode and back to mouse mode
+- confirm thumb-index pinch types the hovered key in keyboard mode
+- confirm thumb-middle pinch sends backspace in keyboard mode
+- confirm thumb-pinky pinch arms one-shot Shift for the next letter key press
 
 Next implementation phase after validation:
-- Phase 6: MLP adapter
+- Phase K7/K8: expose more keyboard tuning knobs and run a focused keyboard-flaw validation/refinement pass
 
 ## Important warnings for future work
 
@@ -175,6 +217,7 @@ Next implementation phase after validation:
 - `toggle` must not kill recognition.
 - `idle` must not be used as the basis for movement semantics.
 - Keyboard behavior should come from the cleaner `hand_controller` design.
+- `hold`, `undo`, and `redo` should stay inactive while in keyboard mode.
 - Clicking should stay rule-based even if the MLP predicts click labels.
 
 ## If another AI continues this work
