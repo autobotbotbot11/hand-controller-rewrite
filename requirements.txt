@@ -1,0 +1,10 @@
+# Phase 2 vision baseline only.
+# MediaPipe is installed separately with --no-deps to avoid pulling heavyweight
+# extras (jax/jaxlib/matplotlib) that are not needed for hand tracking.
+absl-py==2.4.0
+attrs==26.1.0
+flatbuffers==25.12.19
+matplotlib==3.10.8
+numpy==1.26.4
+opencv-contrib-python==4.11.0.86
+protobuf==4.25.8
