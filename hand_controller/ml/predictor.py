@@ -53,7 +53,7 @@ class MLPredictor:
             import numpy as np
         except ModuleNotFoundError as exc:
             raise RuntimeError(
-                "ML dependencies are missing. Install requirements-later.txt before using Phase 6."
+                "ML dependencies are missing. Install requirements.txt before using Phase 6."
             ) from exc
 
         self._np = np

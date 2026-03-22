@@ -1,3 +1,0 @@
-# Extra packages needed to run the Phase 4 mouse smoke test.
-pyautogui==0.9.54
-pillow==12.1.1

@@ -12,7 +12,7 @@ Open PowerShell in the repo root and run:
 
 This will:
 - create `.venv` if needed
-- install the current app dependencies
+- install the current app dependencies from `requirements.txt`
 - install `mediapipe==0.10.21` with the repo's tested setup
 
 ## Run the app

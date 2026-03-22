@@ -98,25 +98,17 @@ Example:
 Target runtime:
 - Python 3.11
 
-Current phase-based install strategy:
+Current install strategy:
 - `requirements.txt`
-  - `absl-py==2.4.0`
-  - `attrs==26.1.0`
-  - `flatbuffers==25.12.19`
-  - `matplotlib==3.10.8`
-  - `numpy==1.26.4`
-  - `opencv-contrib-python==4.11.0.86`
-  - `protobuf==4.25.8`
+  - consolidated app dependencies for tracking, UI, mouse control, and ML loading
 - `mediapipe==0.10.21 --no-deps`
-- `requirements-phase4.txt`
-  - `pyautogui==0.9.54`
-  - `pillow==12.1.1`
-- `requirements-later.txt`
-  - heavier packages for ML and UI phases, including `scikit-learn==1.7.2`, `joblib`, and `PyQt5`
+  - still installed separately in the tested setup flow
 - `tuning.local.json`
   - optional repo-root JSON overrides that let the user tune click and movement behavior without editing Python code
 - `tuning.recommended.json`
   - recommended preset for testing the current click/drag behavior without relying on whatever values are in `tuning.local.json`
+- `tuning.testing.json`
+  - shared tester baseline used by `run-tester.ps1`
 
 Reason:
 - this avoids pulling unnecessary heavy MediaPipe extras too early
@@ -171,7 +163,7 @@ Current package files:
 - `hand_controller/runtime/ui_live_control.py`
 
 Tester-friendly repo entrypoints:
-- `requirements-app.txt`
+- `requirements.txt`
 - `tuning.testing.json`
 - `setup-tester.ps1`
 - `run-tester.ps1`
@@ -190,7 +182,7 @@ Current validation task:
 - confirm the validator reports `ml_uses_local_artifacts=True`
 - run `python -m hand_controller --ui-live --tuning .\\tuning.local.json`
 - confirm keyboard visual tuning now responds to JSON config changes without Python edits
-- install `requirements-later.txt` if PyQt5 is not present yet
+- install `requirements.txt` if the full app dependencies are not present yet
 - run `python -m hand_controller --ui-smoke`
 - confirm the control panel window opens
 - click Start and confirm the transparent fullscreen overlay opens
@@ -211,7 +203,7 @@ Current validation task:
 - confirm `ESC` sits beside `Q` and `TAB` sits beside `A` on the `ABC` page
 - confirm `Shift` visibly changes the alpha page
 - confirm `Caps Lock` visibly changes the alpha page and behaves predictably
-- install `requirements-later.txt` if ML dependencies are not present yet
+- install `requirements.txt` if the ML dependencies are not present yet
 - run `python -m hand_controller --control-smoke`
 - confirm left click via quick thumb-index pinch-and-release
 - confirm right click via thumb-middle pinch down

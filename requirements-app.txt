@@ -1,6 +1,0 @@
-# Tester-friendly install target for the current app.
-# Group members who only need to run the app should use this file,
-# then install MediaPipe once with --no-deps.
--r requirements.txt
--r requirements-later.txt
--r requirements-phase4.txt

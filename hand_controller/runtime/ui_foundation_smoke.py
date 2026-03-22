@@ -109,14 +109,20 @@ def run_ui_foundation_smoke(config: AppConfig) -> None:
         from ..ui.main_window import MainWindow
     except ModuleNotFoundError as exc:
         raise RuntimeError(
-            "PyQt5 is required for --ui-smoke. Install requirements-later.txt first."
+            "PyQt5 is required for --ui-smoke. Install requirements.txt first."
         ) from exc
 
     app = QApplication.instance() or QApplication([])
     window = MainWindow(
         config=config,
         worker_fn=run_ui_foundation_worker,
-        ui_mode_label="Transparent Overlay Foundation",
+        ui_mode_label="Overlay Preview",
+        start_button_label="Start Preview",
+        stop_button_label="Stop Preview",
+        info_text=(
+            "This preview checks the control panel and transparent overlay flow.\n"
+            "It uses mock overlay content instead of the live camera runtime."
+        ),
     )
     window.show()
     app.exec_()

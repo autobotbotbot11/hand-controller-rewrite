@@ -8,7 +8,7 @@ if (-not (Test-Path ".venv")) {
 }
 
 & ".\.venv\Scripts\python.exe" -m pip install -U pip
-& ".\.venv\Scripts\python.exe" -m pip install -r ".\requirements-app.txt"
+& ".\.venv\Scripts\python.exe" -m pip install -r ".\requirements.txt"
 & ".\.venv\Scripts\python.exe" -m pip install mediapipe==0.10.21 --no-deps
 
 Write-Host ""

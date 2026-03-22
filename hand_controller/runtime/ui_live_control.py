@@ -245,23 +245,18 @@ def run_ui_live_control(config: AppConfig) -> None:
         from ..ui.main_window import MainWindow
     except ModuleNotFoundError as exc:
         raise RuntimeError(
-            "PyQt5 is required for --ui-live. Install requirements-later.txt first."
+            "PyQt5 is required for --ui-live. Install requirements.txt first."
         ) from exc
 
     app = QApplication.instance() or QApplication([])
     window = MainWindow(
         config=config,
         worker_fn=run_ui_live_worker,
-        ui_mode_label="Live Transparent Overlay",
-        start_button_label="Start Live Overlay",
+        ui_mode_label="Live Control",
+        start_button_label="Start",
+        stop_button_label="Stop",
         info_text=(
-            "Current behavior:\n"
-            "- Start launches the real live control worker.\n"
-            "- The transparent overlay receives real keyboard, skeleton, selfie, and status payloads.\n"
-            "- Mouse mode still executes real cursor and click actions.\n"
-            "- Keyboard mode renders on the Qt overlay instead of the OpenCV window.\n"
-            "- Mouse and keyboard mode transitions now share one centralized control engine.\n\n"
-            "This is the live integrated overlay path through K6 cleanup."
+            ""
         ),
     )
     window.show()
