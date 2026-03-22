@@ -4,6 +4,23 @@ Clean rewrite of the hand-based mouse and keyboard controller.
 
 This repo intentionally starts from a frozen contract instead of merging the two older codebases directly.
 
+## Group Testing Quick Start
+If your groupmate only needs to test the current app, use this flow:
+
+```powershell
+.\setup-tester.ps1
+.\run-tester.ps1
+```
+
+Tester guide:
+- [docs/group-testing.md](/C:/Users/acer/school/self-study/programming/projects/computer-vision-mouse-control/hand-controller-rewrite/docs/group-testing.md)
+
+Tester-friendly files:
+- `requirements-app.txt`
+- `tuning.testing.json`
+- `setup-tester.ps1`
+- `run-tester.ps1`
+
 Current status:
 - Phase 0 complete: gesture contract and architecture contract are frozen.
 - Phase 1 complete: minimal runnable package skeleton exists.
@@ -53,6 +70,7 @@ The config still keeps the old `touch-v15` fallback paths as a safety net, but t
 - `docs/phase-plan.md`
 - `docs/keyboard-v1-design.md`
 - `docs/keyboard-v1-implementation-plan.md`
+- `docs/group-testing.md`
 
 ## Setup
 ```powershell
@@ -263,7 +281,9 @@ When the ML artifacts and dependencies are available:
 - keyboard hit-testing uses fingertip positions mapped into the active keyboard layout space
 - the live overlay keyboard now uses 2 pages:
   - `ABC` page:
+    - `ESC` beside `Q`
     - letters `A-Z`
+    - `TAB` beside `A`
     - `SHIFT`
     - `CAPS`
     - `BACKSPACE`
@@ -273,8 +293,6 @@ When the ML artifacts and dependencies are available:
   - `123/symbols` page:
     - digits `0-9`
     - `; : ' " , . / \\ - _ ? ! ( )`
-    - `TAB`
-    - `ESC`
     - `BACKSPACE`
     - `ABC`
     - `SPACE`

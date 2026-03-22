@@ -150,6 +150,7 @@ Repo-local source of truth:
 - `docs/phase-plan.md`
 - `docs/keyboard-v1-design.md`
 - `docs/keyboard-v1-implementation-plan.md`
+- `docs/group-testing.md`
 
 Current package files:
 - `hand_controller/app.py`
@@ -168,6 +169,13 @@ Current package files:
 - `hand_controller/ui/signals.py`
 - `hand_controller/runtime/ui_foundation_smoke.py`
 - `hand_controller/runtime/ui_live_control.py`
+
+Tester-friendly repo entrypoints:
+- `requirements-app.txt`
+- `tuning.testing.json`
+- `setup-tester.ps1`
+- `run-tester.ps1`
+- `docs/group-testing.md`
 
 Smoke tests already passed:
 - `python -m compileall hand_controller`
@@ -200,6 +208,7 @@ Current validation task:
 - confirm switching modes does not leave stale drag/click state behind
 - confirm punctuation keys now produce output
 - confirm the `ABC` / `123` page switch feels usable
+- confirm `ESC` sits beside `Q` and `TAB` sits beside `A` on the `ABC` page
 - confirm `Shift` visibly changes the alpha page
 - confirm `Caps Lock` visibly changes the alpha page and behaves predictably
 - install `requirements-later.txt` if ML dependencies are not present yet
