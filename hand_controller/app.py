@@ -17,7 +17,7 @@ def build_boot_message(config: AppConfig, state: RuntimeState) -> str:
             f"control_enabled={state.control_enabled}",
             f"tuning={config.tuning_path or 'defaults'}",
             f"ml_enabled={config.ml.enabled}",
-            "status=phase-k6-ready",
+            "status=phase-k7-ready",
         ]
     )
 

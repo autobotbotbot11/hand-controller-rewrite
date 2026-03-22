@@ -140,6 +140,8 @@ Completed:
 - Phase K4 baseline code: `controllers/keyboard_controller.py` now builds a data-driven full keyboard layout with a complete practical key set and configurable row/size/width settings
 - Phase K6 cleanup code: `runtime/control_engine.py` now centralizes mouse mode, keyboard mode, ML updates, and transition cleanup so both `--control-smoke` and `--ui-live` share the same behavior
 - Hardening baseline: local ML artifacts now exist in `artifacts/`, and `runtime/validation.py` provides a repo-local validation command
+- Phase K7 config exposure: the Qt overlay now reads keyboard visual settings from `KeyboardConfig`, including selfie size, pointer radius, skeleton visibility, font sizes, and status panel sizing
+- Keyboard redesign baseline: `controllers/keyboard_controller.py` now uses a 2-page model (`ABC` + `123/symbols`), fixes punctuation key output mappings, adds `Caps Lock`, and visibly changes alpha-page case for `Shift` / `Caps`
 - Current Phase 6 behavior uses configurable ML settings under the `ml` section of the tuning JSON files.
 
 Repo-local source of truth:
@@ -156,6 +158,7 @@ Current package files:
 - `hand_controller/runtime/control_engine.py`
 - `hand_controller/runtime/validation.py`
 - `hand_controller/ml/labels.py`
+- `hand_controller/ui/overlay_window.py`
 - `hand_controller/controllers/keyboard_controller.py`
 - `hand_controller/controllers/mode_toggle.py`
 - `hand_controller/gestures/hand_pinches.py`
@@ -177,6 +180,8 @@ Current validation task:
 - run `python -m hand_controller --validate`
 - confirm the rewrite resolves ML artifacts from `hand-controller-rewrite/artifacts/`
 - confirm the validator reports `ml_uses_local_artifacts=True`
+- run `python -m hand_controller --ui-live --tuning .\\tuning.local.json`
+- confirm keyboard visual tuning now responds to JSON config changes without Python edits
 - install `requirements-later.txt` if PyQt5 is not present yet
 - run `python -m hand_controller --ui-smoke`
 - confirm the control panel window opens
@@ -193,6 +198,10 @@ Current validation task:
 - confirm layout sizing and spacing remain sensible on the user's display
 - confirm mouse <-> keyboard transitions feel stable in both `--control-smoke` and `--ui-live`
 - confirm switching modes does not leave stale drag/click state behind
+- confirm punctuation keys now produce output
+- confirm the `ABC` / `123` page switch feels usable
+- confirm `Shift` visibly changes the alpha page
+- confirm `Caps Lock` visibly changes the alpha page and behaves predictably
 - install `requirements-later.txt` if ML dependencies are not present yet
 - run `python -m hand_controller --control-smoke`
 - confirm left click via quick thumb-index pinch-and-release
@@ -211,7 +220,7 @@ Current validation task:
 - confirm thumb-pinky pinch arms one-shot Shift for the next letter key press
 
 Next implementation phase after validation:
-- Phase K7/K8: expose more keyboard tuning knobs and run a focused keyboard-flaw validation/refinement pass
+- Phase K8: focused keyboard-flaw validation/refinement pass
 
 ## Important warnings for future work
 

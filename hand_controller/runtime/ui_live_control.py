@@ -22,9 +22,6 @@ if TYPE_CHECKING:
     from ..ui.signals import OverlaySignalBus
 
 
-SELFIE_WIDTH = 320
-SELFIE_HEIGHT = 240
-
 def _screen_xy(x_norm: float, y_norm: float, screen_width: int, screen_height: int) -> tuple[int, int]:
     return int(x_norm * screen_width), int(y_norm * screen_height)
 
@@ -70,9 +67,9 @@ def _build_pointer_payload(keyboard_update: KeyboardUpdate) -> tuple[OverlayPoin
     )
 
 
-def _build_selfie_frame(frame_bgr) -> object | None:
+def _build_selfie_frame(frame_bgr, *, width: int, height: int) -> object | None:
     try:
-        return cv2.resize(frame_bgr, (SELFIE_WIDTH, SELFIE_HEIGHT))
+        return cv2.resize(frame_bgr, (width, height))
     except Exception:
         return None
 
@@ -190,7 +187,11 @@ def run_ui_live_worker(
                     runtime_state=frame_result.runtime_state,
                     keyboard_update=frame_result.keyboard_update,
                     skeleton_lines=_build_skeleton_lines(frame_result.vision, tracker, screen_width, screen_height),
-                    selfie_frame=_build_selfie_frame(frame_bgr),
+                    selfie_frame=_build_selfie_frame(
+                        frame_bgr,
+                        width=config.keyboard.selfie_width_px,
+                        height=config.keyboard.selfie_height_px,
+                    ),
                     mouse_status=frame_result.movement_status,
                     debug_tags=_build_debug_tags(
                         selected=frame_result.selected,

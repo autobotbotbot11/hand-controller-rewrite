@@ -133,7 +133,7 @@ class MainWindow(QMainWindow):
         if self.running:
             return
 
-        self.overlay = OverlayWindow()
+        self.overlay = OverlayWindow(self.config.keyboard)
         self.overlay_bus = OverlaySignalBus()
         self.overlay_bus.update_overlay.connect(self.overlay.apply_payload)
 

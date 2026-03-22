@@ -58,13 +58,37 @@ class KeyboardConfig:
     bottom_margin_px: int = 20
     key_gap_px: int = 6
     row_gap_px: int = 6
+    show_skeleton: bool = True
+    show_pointers: bool = True
+    show_selfie: bool = True
+    selfie_width_px: int = 320
+    selfie_height_px: int = 240
+    key_label_font_px: int = 14
+    pointer_label_font_px: int = 10
+    header_font_px: int = 14
+    status_font_px: int = 12
+    footer_font_px: int = 11
+    pointer_radius_px: int = 9
+    pointer_stroke_px: int = 2
+    skeleton_stroke_px: int = 2
+    key_border_px: int = 2
+    key_hover_border_px: int = 3
+    status_panel_max_width_px: int = 880
+    status_line_height_px: int = 22
     layout_rows: tuple[tuple[str, ...], ...] = field(
         default_factory=lambda: (
-            ("ESC", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "BACKSPACE"),
-            ("TAB", "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"),
-            ("A", "S", "D", "F", "G", "H", "J", "K", "L", "SEMICOLON", "APOSTROPHE", "ENTER"),
-            ("SHIFT", "Z", "X", "C", "V", "B", "N", "M", "COMMA", "PERIOD", "SLASH"),
-            ("SPACE", "MINUS", "UNDERSCORE", "QUESTION", "EXCLAMATION", "LPAREN", "RPAREN", "BACKSLASH"),
+            ("Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"),
+            ("A", "S", "D", "F", "G", "H", "J", "K", "L"),
+            ("SHIFT", "Z", "X", "C", "V", "B", "N", "M", "BACKSPACE"),
+            ("PAGE_SYMBOLS", "CAPS", "SPACE", "ENTER"),
+        )
+    )
+    symbol_layout_rows: tuple[tuple[str, ...], ...] = field(
+        default_factory=lambda: (
+            ("1", "2", "3", "4", "5", "6", "7", "8", "9", "0"),
+            ("SEMICOLON", "COLON", "APOSTROPHE", "DOUBLE_QUOTE", "COMMA", "PERIOD", "SLASH", "BACKSLASH", "MINUS", "UNDERSCORE"),
+            ("QUESTION", "EXCLAMATION", "LPAREN", "RPAREN", "TAB", "ESC", "BACKSPACE"),
+            ("PAGE_ALPHA", "SPACE", "ENTER"),
         )
     )
     key_width_units: dict[str, float] = field(
@@ -74,6 +98,9 @@ class KeyboardConfig:
             "TAB": 1.40,
             "ENTER": 1.80,
             "SHIFT": 1.80,
+            "CAPS": 1.60,
+            "PAGE_SYMBOLS": 1.50,
+            "PAGE_ALPHA": 1.50,
             "SPACE": 4.60,
             "MINUS": 1.10,
             "UNDERSCORE": 1.10,

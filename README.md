@@ -19,6 +19,8 @@ Current status:
 - Phase K4 baseline code exists: the keyboard layout is now data-driven, uses a complete practical key set, and supports configurable sizing, spacing, bottom margin, row definitions, and per-key width units.
 - Phase K6 cleanup code exists: mouse mode, keyboard mode, ML gating, and transition handling now flow through one shared live-control engine used by both `--control-smoke` and `--ui-live`.
 - Hardening baseline exists: rewrite-local ML artifacts now live under `artifacts/`, and `--validate` checks imports, local artifact presence, and ML loading from this repo.
+- Phase K7 config exposure exists: keyboard overlay visuals like selfie size, pointer radius, skeleton visibility, font sizes, and status panel sizing are now driven by the `keyboard` config.
+- Keyboard redesign baseline exists: the keyboard now uses a 2-page model (`ABC` + `123/symbols`), includes `Caps Lock`, and shows visible case changes on the alpha page.
 
 ## Baseline
 - Python 3.11
@@ -130,7 +132,7 @@ What it does:
 - renders live skeleton lines, selfie preview, and status text on the same overlay
 - keeps mouse actions active in mouse mode
 - uses the Qt overlay instead of the OpenCV debug window for keyboard rendering
-- uses a data-driven keyboard layout instead of the old simplified QWERTY-only keyboard
+- uses a data-driven 2-page keyboard layout instead of the old simplified QWERTY-only keyboard
 - uses the same shared control engine as `--control-smoke`, so mode transitions and ML/mouse/keyboard gating stay consistent
 
 ## Live Control Smoke Run
@@ -184,7 +186,25 @@ Keyboard fields live under the `keyboard` section:
 - `bottom_margin_px`
 - `key_gap_px`
 - `row_gap_px`
+- `show_skeleton`
+- `show_pointers`
+- `show_selfie`
+- `selfie_width_px`
+- `selfie_height_px`
+- `key_label_font_px`
+- `pointer_label_font_px`
+- `header_font_px`
+- `status_font_px`
+- `footer_font_px`
+- `pointer_radius_px`
+- `pointer_stroke_px`
+- `skeleton_stroke_px`
+- `key_border_px`
+- `key_hover_border_px`
+- `status_panel_max_width_px`
+- `status_line_height_px`
 - `layout_rows`
+- `symbol_layout_rows`
 - `key_width_units`
 - `index_pinch_threshold_px`
 - `middle_pinch_threshold_px`
@@ -241,27 +261,25 @@ When the ML artifacts and dependencies are available:
 - keyboard mode remains one-hand usable
 - `hold`, `undo`, and `redo` are ignored while in keyboard mode
 - keyboard hit-testing uses fingertip positions mapped into the active keyboard layout space
-- the live overlay keyboard now includes a complete practical key set:
-  - `ESC`
-  - digits `0-9`
-  - letters `A-Z`
-  - `TAB`
-  - `BACKSPACE`
-  - `ENTER`
-  - `SHIFT`
-  - `SPACE`
-  - `;`
-  - `'`
-  - `,`
-  - `.`
-  - `/`
-  - `\\`
-  - `-`
-  - `_`
-  - `?`
-  - `!`
-  - `(`
-  - `)`
+- the live overlay keyboard now uses 2 pages:
+  - `ABC` page:
+    - letters `A-Z`
+    - `SHIFT`
+    - `CAPS`
+    - `BACKSPACE`
+    - `SPACE`
+    - `ENTER`
+    - `123`
+  - `123/symbols` page:
+    - digits `0-9`
+    - `; : ' " , . / \\ - _ ? ! ( )`
+    - `TAB`
+    - `ESC`
+    - `BACKSPACE`
+    - `ABC`
+    - `SPACE`
+    - `ENTER`
+- alpha-page letters visibly switch between lowercase and uppercase based on `Shift` / `Caps Lock`
 
 Artifact lookup order:
 1. `hand-controller-rewrite/artifacts/`

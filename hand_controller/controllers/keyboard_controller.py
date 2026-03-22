@@ -10,6 +10,8 @@ from .actions import Action, Hotkey, KeyPress
 
 
 INDEX_TIP_IDX = 8
+PAGE_ALPHA = "alpha"
+PAGE_SYMBOLS = "symbols"
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +45,8 @@ class KeyboardPointer:
 @dataclass(slots=True)
 class KeyboardState:
     shift_one_shot: bool = False
+    caps_lock: bool = False
+    current_page: str = PAGE_ALPHA
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,6 +57,8 @@ class KeyboardUpdate:
     pointers: tuple[KeyboardPointer, ...] = ()
     hovered_key_by_hand: tuple[tuple[str, str | None], ...] = ()
     shift_armed: bool = False
+    caps_lock: bool = False
+    page: str = PAGE_ALPHA
     status: str = "keyboard idle"
 
 
@@ -63,106 +69,73 @@ def _build_default_specs() -> dict[str, KeyboardKeySpec]:
         "BACKSPACE": KeyboardKeySpec("BACKSPACE", "BKSP", "key", "backspace", width_units=1.90),
         "ENTER": KeyboardKeySpec("ENTER", "ENTER", "key", "enter", width_units=1.80),
         "SHIFT": KeyboardKeySpec("SHIFT", "SHIFT", "shift_one_shot", None, width_units=1.80),
+        "CAPS": KeyboardKeySpec("CAPS", "CAPS", "caps_lock", None, width_units=1.60),
+        "PAGE_SYMBOLS": KeyboardKeySpec("PAGE_SYMBOLS", "123", "page", PAGE_SYMBOLS, width_units=1.50),
+        "PAGE_ALPHA": KeyboardKeySpec("PAGE_ALPHA", "ABC", "page", PAGE_ALPHA, width_units=1.50),
         "SPACE": KeyboardKeySpec("SPACE", "SPACE", "key", "space", width_units=4.60),
         "SEMICOLON": KeyboardKeySpec(
             "SEMICOLON",
             ";",
             "key",
-            "semicolon",
+            ";",
             shift_action_kind="hotkey",
-            shift_action_value=("shift", "semicolon"),
+            shift_action_value=("shift", ";"),
         ),
+        "COLON": KeyboardKeySpec("COLON", ":", "hotkey", ("shift", ";")),
         "APOSTROPHE": KeyboardKeySpec(
             "APOSTROPHE",
             "'",
             "key",
-            "quote",
+            "'",
             shift_action_kind="hotkey",
-            shift_action_value=("shift", "quote"),
+            shift_action_value=("shift", "'"),
         ),
+        "DOUBLE_QUOTE": KeyboardKeySpec("DOUBLE_QUOTE", '"', "hotkey", ("shift", "'")),
         "COMMA": KeyboardKeySpec(
             "COMMA",
             ",",
             "key",
-            "comma",
+            ",",
             shift_action_kind="hotkey",
-            shift_action_value=("shift", "comma"),
+            shift_action_value=("shift", ","),
         ),
         "PERIOD": KeyboardKeySpec(
             "PERIOD",
             ".",
             "key",
-            "period",
+            ".",
             shift_action_kind="hotkey",
-            shift_action_value=("shift", "period"),
+            shift_action_value=("shift", "."),
         ),
         "SLASH": KeyboardKeySpec(
             "SLASH",
             "/",
             "key",
-            "slash",
+            "/",
             shift_action_kind="hotkey",
-            shift_action_value=("shift", "slash"),
+            shift_action_value=("shift", "/"),
         ),
         "BACKSLASH": KeyboardKeySpec(
             "BACKSLASH",
             "\\",
             "key",
-            "backslash",
+            "\\",
             shift_action_kind="hotkey",
-            shift_action_value=("shift", "backslash"),
+            shift_action_value=("shift", "\\"),
         ),
         "MINUS": KeyboardKeySpec(
             "MINUS",
             "-",
             "key",
-            "minus",
+            "-",
             shift_action_kind="hotkey",
-            shift_action_value=("shift", "minus"),
+            shift_action_value=("shift", "-"),
         ),
-        "UNDERSCORE": KeyboardKeySpec(
-            "UNDERSCORE",
-            "_",
-            "hotkey",
-            ("shift", "minus"),
-        ),
-        "QUESTION": KeyboardKeySpec(
-            "QUESTION",
-            "?",
-            "hotkey",
-            ("shift", "slash"),
-        ),
-        "EXCLAMATION": KeyboardKeySpec(
-            "EXCLAMATION",
-            "!",
-            "hotkey",
-            ("shift", "1"),
-        ),
-        "LPAREN": KeyboardKeySpec(
-            "LPAREN",
-            "(",
-            "hotkey",
-            ("shift", "9"),
-        ),
-        "RPAREN": KeyboardKeySpec(
-            "RPAREN",
-            ")",
-            "hotkey",
-            ("shift", "0"),
-        ),
-    }
-
-    shifted_digits = {
-        "1": ("shift", "1"),
-        "2": ("shift", "2"),
-        "3": ("shift", "3"),
-        "4": ("shift", "4"),
-        "5": ("shift", "5"),
-        "6": ("shift", "6"),
-        "7": ("shift", "7"),
-        "8": ("shift", "8"),
-        "9": ("shift", "9"),
-        "0": ("shift", "0"),
+        "UNDERSCORE": KeyboardKeySpec("UNDERSCORE", "_", "hotkey", ("shift", "-")),
+        "QUESTION": KeyboardKeySpec("QUESTION", "?", "hotkey", ("shift", "/")),
+        "EXCLAMATION": KeyboardKeySpec("EXCLAMATION", "!", "hotkey", ("shift", "1")),
+        "LPAREN": KeyboardKeySpec("LPAREN", "(", "hotkey", ("shift", "9")),
+        "RPAREN": KeyboardKeySpec("RPAREN", ")", "hotkey", ("shift", "0")),
     }
 
     for digit in "1234567890":
@@ -171,8 +144,6 @@ def _build_default_specs() -> dict[str, KeyboardKeySpec]:
             digit,
             "key",
             digit,
-            shift_action_kind="hotkey",
-            shift_action_value=shifted_digits[digit],
         )
 
     for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
@@ -226,18 +197,24 @@ def _create_action(kind: str | None, value: str | tuple[str, ...] | None) -> Act
         if isinstance(value, list):
             return Hotkey(tuple(str(part) for part in value))
         raise ValueError(f"Hotkey action expects a tuple/list, got {type(value)!r}")
-    raise ValueError(f"Unknown keyboard action kind: {kind}")
+    return None
+
+
+def _is_letter_token(token: str) -> bool:
+    return len(token) == 1 and token.isalpha()
 
 
 def create_keyboard_layout(
     frame_width: int,
     frame_height: int,
     settings: KeyboardConfig,
+    *,
+    rows: Sequence[Sequence[str]] | Sequence[str] | None = None,
 ) -> tuple[KeyboardKeyRect, ...]:
-    rows = _normalize_layout_rows(settings.layout_rows)
+    normalized_rows = _normalize_layout_rows(rows if rows is not None else settings.layout_rows)
     width_units = _resolve_width_units(settings)
 
-    for row in rows:
+    for row in normalized_rows:
         for token in row:
             if token not in KEY_SPECS:
                 raise ValueError(f"Unknown keyboard layout token: {token}")
@@ -252,12 +229,12 @@ def create_keyboard_layout(
 
     unit_width = min(
         (keyboard_width - gap_x * max(0, len(row) - 1)) / max(1.0, sum(width_units[token] for token in row))
-        for row in rows
+        for row in normalized_rows
     )
-    row_height = (keyboard_height - gap_y * max(0, len(rows) - 1)) / len(rows)
+    row_height = (keyboard_height - gap_y * max(0, len(normalized_rows) - 1)) / len(normalized_rows)
 
     keys: list[KeyboardKeyRect] = []
-    for row_index, row in enumerate(rows):
+    for row_index, row in enumerate(normalized_rows):
         y1 = int(round(keyboard_top + row_index * (row_height + gap_y)))
         y2 = int(round(y1 + row_height))
 
@@ -295,19 +272,76 @@ class KeyboardController:
     def __init__(self, settings: KeyboardConfig | None = None) -> None:
         self.settings = settings or KeyboardConfig()
         self.state = KeyboardState()
-        self._layout_cache: tuple[int, int, tuple[KeyboardKeyRect, ...]] | None = None
+        self._layout_cache: dict[tuple[int, int, str], tuple[KeyboardKeyRect, ...]] = {}
 
     def reset(self) -> None:
         self.state.shift_one_shot = False
+        self.state.caps_lock = False
+        self.state.current_page = PAGE_ALPHA
+
+    def _rows_for_current_page(self) -> tuple[tuple[str, ...], ...]:
+        if self.state.current_page == PAGE_SYMBOLS:
+            return _normalize_layout_rows(self.settings.symbol_layout_rows)
+        return _normalize_layout_rows(self.settings.layout_rows)
+
+    def _should_uppercase_letters(self) -> bool:
+        return self.state.caps_lock != self.state.shift_one_shot
+
+    def _display_label(self, token: str) -> str:
+        spec = KEY_SPECS[token]
+        if self.state.current_page == PAGE_ALPHA and _is_letter_token(token):
+            return token if self._should_uppercase_letters() else token.lower()
+        return spec.label
+
+    def _render_layout(self, base_layout: tuple[KeyboardKeyRect, ...]) -> tuple[KeyboardKeyRect, ...]:
+        return tuple(
+            KeyboardKeyRect(
+                token=key.token,
+                label=self._display_label(key.token),
+                x1=key.x1,
+                y1=key.y1,
+                x2=key.x2,
+                y2=key.y2,
+            )
+            for key in base_layout
+        )
 
     def layout_for_frame(self, frame_width: int, frame_height: int) -> tuple[KeyboardKeyRect, ...]:
-        cached = self._layout_cache
-        if cached is not None and cached[0] == frame_width and cached[1] == frame_height:
-            return cached[2]
+        cache_key = (frame_width, frame_height, self.state.current_page)
+        cached = self._layout_cache.get(cache_key)
+        if cached is not None:
+            return self._render_layout(cached)
 
-        layout = create_keyboard_layout(frame_width, frame_height, self.settings)
-        self._layout_cache = (frame_width, frame_height, layout)
-        return layout
+        layout = create_keyboard_layout(
+            frame_width,
+            frame_height,
+            self.settings,
+            rows=self._rows_for_current_page(),
+        )
+        self._layout_cache[cache_key] = layout
+        return self._render_layout(layout)
+
+    def _activate_special_token(self, token: str) -> None:
+        if token == "SHIFT":
+            self.state.shift_one_shot = not self.state.shift_one_shot
+        elif token == "CAPS":
+            self.state.caps_lock = not self.state.caps_lock
+            self.state.shift_one_shot = False
+        elif token == "PAGE_SYMBOLS":
+            self.state.current_page = PAGE_SYMBOLS
+            self.state.shift_one_shot = False
+        elif token == "PAGE_ALPHA":
+            self.state.current_page = PAGE_ALPHA
+            self.state.shift_one_shot = False
+
+    def _resolve_key_action(self, spec: KeyboardKeySpec) -> Action | None:
+        use_shift_variant = False
+        if self.state.current_page == PAGE_ALPHA and _is_letter_token(spec.token):
+            use_shift_variant = self._should_uppercase_letters()
+
+        if use_shift_variant and spec.shift_action_kind is not None:
+            return _create_action(spec.shift_action_kind, spec.shift_action_value)
+        return _create_action(spec.action_kind, spec.action_value)
 
     def update(
         self,
@@ -324,8 +358,6 @@ class KeyboardController:
         hovered_by_hand: dict[str, str | None] = {"Left": None, "Right": None}
 
         for pinch_state in pinch_states.values():
-            if pinch_state.pinky.down:
-                self.state.shift_one_shot = True
             if pinch_state.middle.down:
                 actions.append(KeyPress("backspace"))
 
@@ -347,25 +379,29 @@ class KeyboardController:
                 continue
 
             spec = KEY_SPECS[key.token]
-            if spec.action_kind == "shift_one_shot":
-                self.state.shift_one_shot = True
+            if spec.action_kind in {"shift_one_shot", "caps_lock", "page"}:
+                self._activate_special_token(key.token)
+                layout = self.layout_for_frame(frame_width, frame_height)
                 continue
 
-            if self.state.shift_one_shot and spec.shift_action_kind is not None:
-                action = _create_action(spec.shift_action_kind, spec.shift_action_value)
-            else:
-                action = _create_action(spec.action_kind, spec.action_value)
-
+            action = self._resolve_key_action(spec)
             if action is not None:
                 actions.append(action)
             self.state.shift_one_shot = False
 
+        if self.state.shift_one_shot:
+            highlights.add("SHIFT")
+        if self.state.caps_lock and self.state.current_page == PAGE_ALPHA:
+            highlights.add("CAPS")
+
         hovered_pairs = tuple(sorted(hovered_by_hand.items()))
-        hovered_summary = " ".join(
-            f"{hand}:{label or '-'}"
-            for hand, label in hovered_pairs
+        hovered_summary = " ".join(f"{hand}:{label or '-'}" for hand, label in hovered_pairs)
+        status = (
+            f"keyboard page={self.state.current_page} "
+            f"shift={'on' if self.state.shift_one_shot else 'off'} "
+            f"caps={'on' if self.state.caps_lock else 'off'} "
+            f"hover={hovered_summary}"
         )
-        status = f"keyboard shift={'on' if self.state.shift_one_shot else 'off'} hover={hovered_summary}"
 
         return KeyboardUpdate(
             actions=tuple(actions),
@@ -374,5 +410,7 @@ class KeyboardController:
             pointers=tuple(pointers),
             hovered_key_by_hand=hovered_pairs,
             shift_armed=self.state.shift_one_shot,
+            caps_lock=self.state.caps_lock,
+            page=self.state.current_page,
             status=status,
         )
