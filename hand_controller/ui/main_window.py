@@ -234,7 +234,7 @@ class MainWindow(QMainWindow):
         content = QFrame()
         content.setObjectName("contentFrame")
         content_layout = QVBoxLayout()
-        content_layout.setContentsMargins(14, 14, 18, 14)
+        content_layout.setContentsMargins(12, 18, 18, 16)
         content_layout.setSpacing(0)
         content.setLayout(content_layout)
 
@@ -255,13 +255,14 @@ class MainWindow(QMainWindow):
             QFrame { background: #ffffff; }
             QFrame#sidebarFrame { background: #fbfbfc; border-right: 1px solid #d9dbe3; }
             QFrame#contentFrame { background: #f8f8fb; }
+            QWidget#pageShell, QWidget#scrollInner, QWidget#rowWrapper { background: transparent; }
             QLabel#logoLabel { margin-bottom: 10px; }
-            QLabel#sectionHeader { font-size: 14px; font-weight: 800; letter-spacing: 0.3px; }
-            QLabel#pageTitle { font-size: 18px; font-weight: 800; margin: 2px 0 2px 2px; }
-            QLabel#fieldLabel { font-size: 14px; font-weight: 700; }
-            QLabel#valueLabel { font-size: 11px; color: #b5b5bc; }
+            QLabel#sectionHeader { font-size: 14px; font-weight: 800; letter-spacing: 0.3px; background: transparent; }
+            QLabel#pageTitle { font-size: 18px; font-weight: 800; margin: 0 0 6px 2px; background: transparent; }
+            QLabel#fieldLabel { font-size: 14px; font-weight: 700; background: transparent; }
+            QLabel#valueLabel { font-size: 11px; color: #b5b5bc; background: transparent; }
             QScrollArea { border: none; background: transparent; }
-            QFrame#card { border: 1px solid #e2e3ea; border-radius: 24px; background: #fcfcfd; }
+            QFrame#card { border: 1px solid #dfe0e7; border-radius: 24px; background: #f4f4f7; }
             QPushButton#navActive { background: #efeff4; border: none; border-left: 3px solid #7282ff; border-radius: 8px; padding-left: 16px; text-align: left; font-size: 13px; font-weight: 800; color: #111111; min-height: 38px; }
             QPushButton#navIdle { background: transparent; border: none; border-left: 3px solid transparent; border-radius: 8px; padding-left: 16px; text-align: left; font-size: 13px; font-weight: 700; color: #77777f; min-height: 38px; }
             QPushButton#outlineButton { background: #ffffff; border: 1px solid #d8d8dd; border-radius: 3px; min-height: 28px; padding: 2px 10px; font-size: 12px; color: #7a7a80; }
@@ -328,9 +329,10 @@ class MainWindow(QMainWindow):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         inner = QWidget()
+        inner.setObjectName("scrollInner")
         inner_layout = QVBoxLayout()
         inner_layout.setContentsMargins(0, 0, 0, 20)
-        inner_layout.setSpacing(14)
+        inner_layout.setSpacing(8)
         inner.setLayout(inner_layout)
 
         title_label = QLabel(title)
@@ -351,7 +353,7 @@ class MainWindow(QMainWindow):
         card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         layout = QVBoxLayout()
         layout.setContentsMargins(18, 18, 18, 18)
-        layout.setSpacing(20)
+        layout.setSpacing(22)
         card.setLayout(layout)
         return card, layout
 
@@ -397,6 +399,7 @@ class MainWindow(QMainWindow):
 
     def _row(self, layout: QVBoxLayout, text: str, control: QWidget, *, help_key: str | None = None, value_label: QLabel | None = None, slider: bool = False) -> None:
         wrapper = QWidget()
+        wrapper.setObjectName("rowWrapper")
         wrapper_layout = QVBoxLayout()
         wrapper_layout.setContentsMargins(0, 0, 0, 0)
         wrapper_layout.setSpacing(8)
