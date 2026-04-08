@@ -259,9 +259,9 @@ class MainWindow(QMainWindow):
             QStackedWidget#pageStack { background: #f8f8fb; }
             QWidget#pageShell, QWidget#scrollInner, QWidget#rowWrapper { background: transparent; }
             QLabel#logoLabel { margin-bottom: 10px; }
-            QLabel#sectionHeader { font-size: 14px; font-weight: 800; letter-spacing: 0.3px; background: transparent; }
-            QLabel#pageTitle { font-size: 18px; font-weight: 800; margin: 0 0 6px 2px; background: transparent; }
-            QLabel#fieldLabel { font-size: 14px; font-weight: 700; background: transparent; }
+            QLabel#sectionHeader { font-size: 13px; font-weight: 800; letter-spacing: 0.2px; background: transparent; }
+            QLabel#pageTitle { font-size: 17px; font-weight: 800; margin: 0 0 6px 2px; background: transparent; }
+            QLabel#fieldLabel { font-size: 13px; font-weight: 700; background: transparent; }
             QLabel#valueLabel { font-size: 11px; color: #b5b5bc; background: transparent; }
             QScrollArea, QScrollArea > QWidget, QScrollArea > QWidget > QWidget { border: none; background: #f8f8fb; }
             QFrame#card { border: 1px solid #dfe0e7; border-radius: 24px; background: #f4f4f7; }
