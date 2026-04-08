@@ -3,9 +3,10 @@ from __future__ import annotations
 import threading
 from collections.abc import Callable
 from dataclasses import replace
+from pathlib import Path
 
 from PyQt5.QtCore import QPointF, QRectF, QSize, Qt, pyqtSlot
-from PyQt5.QtGui import QBrush, QColor, QFont, QPainter, QPen, QPolygonF
+from PyQt5.QtGui import QBrush, QColor, QFont, QPainter, QPen, QPixmap, QPolygonF
 from PyQt5.QtWidgets import (
     QButtonGroup,
     QCheckBox,
@@ -202,8 +203,7 @@ class MainWindow(QMainWindow):
         sidebar_layout.setSpacing(10)
         sidebar.setLayout(sidebar_layout)
 
-        logo = QLabel('<span style="font-size:44px; font-weight:800; color:#407af6;">TOU</span><span style="font-size:44px; font-weight:800; color:#57d6d0;">CH</span>')
-        logo.setTextFormat(Qt.RichText)
+        logo = self._build_logo_widget()
         logo.setObjectName("logoLabel")
         sidebar_layout.addWidget(logo)
 
@@ -279,6 +279,35 @@ class MainWindow(QMainWindow):
     def _section_header(self, text: str) -> QLabel:
         label = QLabel(text)
         label.setObjectName("sectionHeader")
+        return label
+
+    def _build_logo_widget(self) -> QLabel:
+        label = QLabel()
+        candidates = [
+            Path(__file__).resolve().parents[2] / "assets" / "touch-logo.png",
+            Path(__file__).resolve().parents[2] / "assets" / "logo.png",
+            Path(__file__).resolve().parents[2] / "touch-logo.png",
+            Path(__file__).resolve().parents[2] / "logo.png",
+        ]
+        logo_path = next((path for path in candidates if path.exists()), None)
+        if logo_path is not None:
+            pixmap = QPixmap(str(logo_path))
+            if not pixmap.isNull():
+                label.setPixmap(
+                    pixmap.scaled(
+                        132,
+                        64,
+                        Qt.KeepAspectRatio,
+                        Qt.SmoothTransformation,
+                    )
+                )
+                return label
+
+        label.setText(
+            '<span style="font-size:44px; font-weight:800; color:#407af6;">TOU</span>'
+            '<span style="font-size:44px; font-weight:800; color:#57d6d0;">CH</span>'
+        )
+        label.setTextFormat(Qt.RichText)
         return label
 
     def _pill_button(self, text: str, *, launch: bool) -> QPushButton:
