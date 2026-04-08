@@ -33,4 +33,5 @@ class OverlayPayload:
     profile_label: str = ""
     footer_hint: str = ""
     selfie_frame: object | None = None
+    gesture_command_text: str = ""
     debug_tags: tuple[str, ...] = field(default_factory=tuple)

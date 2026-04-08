@@ -124,6 +124,7 @@ def _build_overlay_payload(
     skeleton_lines: tuple[tuple[int, int, int, int], ...],
     selfie_frame,
     mouse_status: str,
+    gesture_command_text: str,
     debug_tags: tuple[str, ...],
 ) -> OverlayPayload:
     keyboard_visible = runtime_state.mode == Mode.KEYBOARD
@@ -140,6 +141,7 @@ def _build_overlay_payload(
         profile_label="live-overlay",
         footer_hint="Live overlay path | close the control panel window to stop",
         selfie_frame=selfie_frame,
+        gesture_command_text=gesture_command_text,
         debug_tags=debug_tags,
     )
 
@@ -193,6 +195,7 @@ def run_ui_live_worker(
                         height=config.keyboard.selfie_height_px,
                     ),
                     mouse_status=frame_result.movement_status,
+                    gesture_command_text=frame_result.gesture_command_text,
                     debug_tags=_build_debug_tags(
                         selected=frame_result.selected,
                         runtime_state=frame_result.runtime_state,
@@ -253,8 +256,8 @@ def run_ui_live_control(config: AppConfig) -> None:
         config=config,
         worker_fn=run_ui_live_worker,
         ui_mode_label="Live Control",
-        start_button_label="Start",
-        stop_button_label="Stop",
+        start_button_label="LAUNCH",
+        stop_button_label="STOP",
         info_text=(
             ""
         ),

@@ -47,6 +47,7 @@ class OverlayWindow(QWidget):
             self._draw_skeleton(painter)
         if self.settings.show_pointers:
             self._draw_pointers(painter)
+        self._draw_gesture_command(painter)
         self._draw_header(painter)
         self._draw_status(painter)
         self._draw_footer(painter)
@@ -126,6 +127,33 @@ class OverlayWindow(QWidget):
         painter.setPen(QColor(190, 190, 190, 220))
         painter.drawText(20, self.height() - 24, self.payload.footer_hint)
 
+    def _draw_gesture_command(self, painter: QPainter) -> None:
+        if not self.settings.show_gesture_command or not self.payload.gesture_command_text:
+            return
+
+        painter.setFont(QFont("Arial", max(16, self.settings.header_font_px + 2), QFont.Bold))
+        metrics = painter.fontMetrics()
+        text = self.payload.gesture_command_text
+        text_width = metrics.horizontalAdvance(text)
+        width = text_width + 32
+        height = metrics.height() + 20
+        x = (self.width() - width) // 2
+
+        position = self.settings.gesture_command_position
+        if position == "center":
+            y = (self.height() - height) // 2
+        elif position == "bottom":
+            y = self.height() - height - 56
+        else:
+            y = 68
+
+        rect = QRect(x, y, width, height)
+        painter.setBrush(QBrush(QColor(0, 0, 0, 175)))
+        painter.setPen(QPen(QColor(255, 255, 255, 0), 0))
+        painter.drawRoundedRect(rect, 14, 14)
+        painter.setPen(QColor(255, 255, 255, 235))
+        painter.drawText(rect, Qt.AlignCenter, text)
+
     def _draw_selfie(self, painter: QPainter) -> None:
         if not self.settings.show_selfie:
             return
@@ -141,5 +169,15 @@ class OverlayWindow(QWidget):
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb.shape
         qimg = QImage(rgb.data, w, h, ch * w, QImage.Format_RGB888)
-        target = QRect(20, 110, self.settings.selfie_width_px, self.settings.selfie_height_px)
+        margin = 20
+        x = margin
+        y = 110
+        if self.settings.selfie_position == "top_right":
+            x = self.width() - self.settings.selfie_width_px - margin
+        elif self.settings.selfie_position == "bottom_left":
+            y = self.height() - self.settings.selfie_height_px - 48
+        elif self.settings.selfie_position == "bottom_right":
+            x = self.width() - self.settings.selfie_width_px - margin
+            y = self.height() - self.settings.selfie_height_px - 48
+        target = QRect(x, y, self.settings.selfie_width_px, self.settings.selfie_height_px)
         painter.drawImage(target, qimg)

@@ -10,7 +10,7 @@ from ..controllers import (
     MouseController,
     execute_actions,
 )
-from ..controllers.actions import Action
+from ..controllers.actions import Action, Click, Hotkey, KeyPress, MouseDown, MouseUp
 from ..controllers.keyboard_controller import KeyboardUpdate
 from ..gestures import (
     HandPinchDetector,
@@ -50,6 +50,7 @@ class ControlFrameResult:
     mode_toggle_status: str
     drag_active: bool
     pre_hold_right_suppressed: bool
+    gesture_command_text: str
 
 
 class LiveControlEngine:
@@ -73,6 +74,70 @@ class LiveControlEngine:
         self.ml_predictor, self.ml_reason = MLPredictor.try_create(config.ml)
         self.ml_adapter = MLControlAdapter(config.ml)
         self._last_mode = self.runtime_state.mode
+        self._gesture_feedback_text = ""
+        self._gesture_feedback_until = 0.0
+
+    def _set_gesture_feedback(self, text: str, now: float) -> None:
+        if not text:
+            return
+        self._gesture_feedback_text = text
+        self._gesture_feedback_until = now + self.config.keyboard.gesture_command_hold_seconds
+
+    def _label_for_action(self, action: Action, *, click_status: str | None = None) -> str:
+        if isinstance(action, Click):
+            if click_status == "Mouse | double click" and action.button == "left":
+                return "Double Click"
+            return "Left Click" if action.button == "left" else "Right Click"
+        if isinstance(action, MouseDown) and action.button == "left":
+            return "Drag Start"
+        if isinstance(action, MouseUp) and action.button == "left":
+            return "Drop"
+        if isinstance(action, Hotkey):
+            if action.keys == ("ctrl", "z"):
+                return "Undo"
+            if action.keys == ("ctrl", "y"):
+                return "Redo"
+            return " + ".join(part.upper() for part in action.keys)
+        if isinstance(action, KeyPress):
+            named = {
+                "space": "Space",
+                "enter": "Enter",
+                "backspace": "Backspace",
+                "tab": "Tab",
+                "esc": "Esc",
+            }
+            if action.key in named:
+                return named[action.key]
+            if len(action.key) == 1:
+                return action.key.upper()
+            return action.key.title()
+        return ""
+
+    def _gesture_feedback(
+        self,
+        *,
+        actions: list[Action],
+        click_status: str | None,
+        mode_toggle_status: str,
+        ml_status: str,
+        now: float,
+    ) -> str:
+        text = ""
+        if "toggled" in mode_toggle_status:
+            text = "Keyboard Mode" if self.runtime_state.mode == Mode.KEYBOARD else "Mouse Mode"
+        elif "toggled" in ml_status:
+            text = "Control On" if self.runtime_state.control_enabled else "Control Off"
+        else:
+            for action in reversed(actions):
+                text = self._label_for_action(action, click_status=click_status)
+                if text:
+                    break
+
+        if text:
+            self._set_gesture_feedback(text, now)
+        if now <= self._gesture_feedback_until:
+            return self._gesture_feedback_text
+        return ""
 
     def _handle_mode_transition(self, now: float) -> tuple[list[Action], str | None]:
         actions: list[Action] = []
@@ -169,6 +234,8 @@ class LiveControlEngine:
         pre_hold_right_suppressed = self._should_pre_hold_suppress_right_click(ml_prediction)
         action_queue = list(transition_actions)
         action_queue.extend(ml_update.actions)
+        feedback_actions = list(ml_update.actions)
+        click_feedback_status: str | None = None
 
         if self.runtime_state.mode == Mode.MOUSE:
             click_enabled = self.runtime_state.control_enabled and not self.runtime_state.hold_active
@@ -200,7 +267,9 @@ class LiveControlEngine:
                 now=now,
             )
             action_queue.extend(mouse_actions)
+            feedback_actions.extend(mouse_actions)
             movement_status = transition_status or mouse_status
+            click_feedback_status = mouse_status
             click_freeze = click_enabled and (
                 click_state.right_pressed
                 or (click_state.left_pressed and not self.mouse_controller.state.drag_active)
@@ -209,18 +278,20 @@ class LiveControlEngine:
             self.click_detector.reset()
             self.runtime_state.movement_frozen = True
 
-            if self.runtime_state.control_enabled:
+            if self.runtime_state.control_enabled and self.config.keyboard.virtual_keyboard_enabled:
                 keyboard_update = self.keyboard_controller.update(
                     hands=vision.hands,
                     pinch_states=pinch_states,
                     frame_width=layout_width,
                     frame_height=layout_height,
+                    now=now,
                 )
                 action_queue.extend(keyboard_update.actions)
+                feedback_actions.extend(keyboard_update.actions)
             else:
                 keyboard_update = KeyboardUpdate(
                     layout=self.keyboard_controller.layout_for_frame(layout_width, layout_height),
-                    status="keyboard control off",
+                    status="keyboard disabled" if not self.config.keyboard.virtual_keyboard_enabled else "keyboard control off",
                 )
 
             mouse_actions, mouse_status = self.mouse_controller.update(
@@ -236,6 +307,13 @@ class LiveControlEngine:
             movement_status = transition_status or ("keyboard mode" if mouse_status == "Mouse | no active hand" else mouse_status)
 
         execute_actions(action_queue)
+        gesture_command_text = self._gesture_feedback(
+            actions=feedback_actions,
+            click_status=click_feedback_status,
+            mode_toggle_status=mode_toggle_update.status,
+            ml_status=ml_update.status,
+            now=now,
+        )
 
         return ControlFrameResult(
             runtime_state=self.runtime_state,
@@ -253,4 +331,5 @@ class LiveControlEngine:
             mode_toggle_status=mode_toggle_update.status,
             drag_active=self.mouse_controller.state.drag_active,
             pre_hold_right_suppressed=pre_hold_right_suppressed,
+            gesture_command_text=gesture_command_text,
         )

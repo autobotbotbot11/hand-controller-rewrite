@@ -41,6 +41,12 @@ class KeyboardModeToggleController:
             self.reset()
             return ModeToggleUpdate(toggled=False, mode=state.mode, status="control off")
 
+        if not self.settings.virtual_keyboard_enabled:
+            if state.mode == Mode.KEYBOARD:
+                state.mode = Mode.MOUSE
+            self.reset()
+            return ModeToggleUpdate(toggled=False, mode=state.mode, status="keyboard disabled")
+
         if active_hand is None or pinch_state is None:
             self.reset()
             return ModeToggleUpdate(toggled=False, mode=state.mode, status="toggle idle")

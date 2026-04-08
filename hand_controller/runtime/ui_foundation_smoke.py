@@ -117,8 +117,8 @@ def run_ui_foundation_smoke(config: AppConfig) -> None:
         config=config,
         worker_fn=run_ui_foundation_worker,
         ui_mode_label="Overlay Preview",
-        start_button_label="Start Preview",
-        stop_button_label="Stop Preview",
+        start_button_label="LAUNCH",
+        stop_button_label="STOP",
         info_text=(
             "This preview checks the control panel and transparent overlay flow.\n"
             "It uses mock overlay content instead of the live camera runtime."

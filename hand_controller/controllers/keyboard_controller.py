@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+import time
 
 from ..config.settings import KeyboardConfig
 from ..gestures.hand_pinches import HandPinchState
@@ -47,6 +48,7 @@ class KeyboardState:
     shift_one_shot: bool = False
     caps_lock: bool = False
     current_page: str = PAGE_ALPHA
+    last_tap_at: float = -1e9
 
 
 @dataclass(frozen=True, slots=True)
@@ -278,6 +280,7 @@ class KeyboardController:
         self.state.shift_one_shot = False
         self.state.caps_lock = False
         self.state.current_page = PAGE_ALPHA
+        self.state.last_tap_at = -1e9
 
     def _rows_for_current_page(self) -> tuple[tuple[str, ...], ...]:
         if self.state.current_page == PAGE_SYMBOLS:
@@ -350,7 +353,9 @@ class KeyboardController:
         pinch_states: dict[str, HandPinchState],
         frame_width: int,
         frame_height: int,
+        now: float | None = None,
     ) -> KeyboardUpdate:
+        now = time.time() if now is None else now
         layout = self.layout_for_frame(frame_width, frame_height)
         actions: list[Action] = []
         highlights: set[str] = set()
@@ -377,16 +382,20 @@ class KeyboardController:
             pinch_state = pinch_states.get(hand_label)
             if pinch_state is None or not pinch_state.index.down:
                 continue
+            if (now - self.state.last_tap_at) < self.settings.tap_cooldown_seconds:
+                continue
 
             spec = KEY_SPECS[key.token]
             if spec.action_kind in {"shift_one_shot", "caps_lock", "page"}:
                 self._activate_special_token(key.token)
+                self.state.last_tap_at = now
                 layout = self.layout_for_frame(frame_width, frame_height)
                 continue
 
             action = self._resolve_key_action(spec)
             if action is not None:
                 actions.append(action)
+                self.state.last_tap_at = now
             self.state.shift_one_shot = False
 
         if self.state.shift_one_shot:

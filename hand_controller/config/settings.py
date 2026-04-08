@@ -13,7 +13,15 @@ DEFAULT_FALLBACK_ARTIFACTS_DIR = REPO_ROOT.parent / "touch-v15" / "hand_controll
 
 
 @dataclass(slots=True, frozen=True)
+class GeneralConfig:
+    language: str = "English"
+    theme: str = "System Default"
+    minimize_after_launch: bool = True
+
+
+@dataclass(slots=True, frozen=True)
 class CameraConfig:
+    enabled: bool = True
     index: int = 0
     width: int = 640
     height: int = 480
@@ -53,6 +61,8 @@ class MouseClickConfig:
 
 @dataclass(slots=True, frozen=True)
 class KeyboardConfig:
+    virtual_keyboard_enabled: bool = True
+    tap_cooldown_seconds: float = 0.15
     height_ratio: float = 0.36
     side_margin_px: int = 20
     bottom_margin_px: int = 20
@@ -61,8 +71,12 @@ class KeyboardConfig:
     show_skeleton: bool = True
     show_pointers: bool = True
     show_selfie: bool = True
+    selfie_position: str = "top_left"
     selfie_width_px: int = 320
     selfie_height_px: int = 240
+    show_gesture_command: bool = True
+    gesture_command_position: str = "top"
+    gesture_command_hold_seconds: float = 0.85
     key_label_font_px: int = 14
     pointer_label_font_px: int = 10
     header_font_px: int = 14
@@ -180,6 +194,7 @@ class MLConfig:
 @dataclass(slots=True, frozen=True)
 class AppConfig:
     python_version: str
+    general: GeneralConfig
     camera: CameraConfig
     tracker: HandTrackerConfig
     selector: HandSelectorConfig
@@ -216,6 +231,7 @@ def _load_tuning_overrides(tuning_path: str | Path | None) -> tuple[dict[str, An
 def _merge_config(base: AppConfig, overrides: dict[str, Any], tuning_path: str | None) -> AppConfig:
     remaining = dict(overrides)
 
+    general = base.general
     camera = base.camera
     tracker = base.tracker
     selector = base.selector
@@ -225,6 +241,7 @@ def _merge_config(base: AppConfig, overrides: dict[str, Any], tuning_path: str |
     ml = base.ml
 
     section_map = {
+        "general": general,
         "camera": camera,
         "tracker": tracker,
         "selector": selector,
@@ -248,6 +265,7 @@ def _merge_config(base: AppConfig, overrides: dict[str, Any], tuning_path: str |
 
     return AppConfig(
         python_version=base.python_version,
+        general=section_map["general"],
         camera=section_map["camera"],
         tracker=section_map["tracker"],
         selector=section_map["selector"],
@@ -262,6 +280,7 @@ def _merge_config(base: AppConfig, overrides: dict[str, Any], tuning_path: str |
 def build_default_config(tuning_path: str | Path | None = None) -> AppConfig:
     base = AppConfig(
         python_version="3.11",
+        general=GeneralConfig(),
         camera=CameraConfig(),
         tracker=HandTrackerConfig(),
         selector=HandSelectorConfig(),
@@ -275,9 +294,26 @@ def build_default_config(tuning_path: str | Path | None = None) -> AppConfig:
     return _merge_config(base, overrides, resolved_path)
 
 
+def build_factory_default_config() -> AppConfig:
+    return AppConfig(
+        python_version="3.11",
+        general=GeneralConfig(),
+        camera=CameraConfig(),
+        tracker=HandTrackerConfig(),
+        selector=HandSelectorConfig(),
+        mouse_motion=MouseMotionConfig(),
+        mouse_click=MouseClickConfig(),
+        keyboard=KeyboardConfig(),
+        ml=MLConfig(),
+        tuning_path=None,
+    )
+
+
 def tuning_snapshot(config: AppConfig) -> dict[str, Any]:
     return {
         "tuning_path": config.tuning_path,
+        "general": asdict(config.general),
+        "camera": asdict(config.camera),
         "mouse_click": asdict(config.mouse_click),
         "keyboard": asdict(config.keyboard),
         "mouse_motion": asdict(config.mouse_motion),
