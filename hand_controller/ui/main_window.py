@@ -148,6 +148,44 @@ class ToggleSwitch(QCheckBox):
         painter.drawEllipse(knob_rect)
 
 
+class NavButton(QPushButton):
+    def __init__(self, text: str) -> None:
+        super().__init__(text)
+        self._active = False
+        self.setCursor(Qt.PointingHandCursor)
+        self.setFlat(True)
+        self.setCheckable(True)
+        self.setFixedHeight(38)
+
+    def set_active(self, active: bool) -> None:
+        self._active = active
+        self.setChecked(active)
+        self.update()
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        rect = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        if self._active:
+            pill_rect = QRectF(rect.left() + 5, rect.top() + 1, rect.width() - 5, rect.height() - 2)
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QBrush(QColor("#efeff4")))
+            painter.drawRoundedRect(pill_rect, 8, 8)
+
+            indicator_rect = QRectF(pill_rect.left() + 2, rect.top() + 11, 2, rect.height() - 22)
+            painter.setBrush(QBrush(QColor("#7282ff")))
+            painter.drawRoundedRect(indicator_rect, 1.0, 1.0)
+
+        painter.setPen(QColor("#111111" if self._active else "#77777f"))
+        painter.setFont(QFont("Segoe UI", 10, QFont.Bold if self._active else QFont.DemiBold))
+        painter.drawText(
+            QRectF(rect.left() + 18, rect.top(), rect.width() - 18, rect.height()),
+            Qt.AlignVCenter | Qt.AlignLeft,
+            self.text(),
+        )
+
+
 class MainWindow(QMainWindow):
     def __init__(
         self,
@@ -217,10 +255,7 @@ class MainWindow(QMainWindow):
         nav_group = QButtonGroup(self)
         nav_group.setExclusive(True)
         for page in PAGE_ORDER:
-            button = QPushButton(page)
-            button.setCheckable(True)
-            button.setCursor(Qt.PointingHandCursor)
-            button.setFixedHeight(38)
+            button = NavButton(page)
             button.clicked.connect(lambda checked=False, name=page: self._set_active_page(name))
             nav_group.addButton(button)
             sidebar_layout.addWidget(button)
@@ -265,8 +300,6 @@ class MainWindow(QMainWindow):
             QLabel#valueLabel { font-size: 11px; color: #b5b5bc; background: transparent; }
             QScrollArea, QScrollArea > QWidget, QScrollArea > QWidget > QWidget { border: none; background: #f8f8fb; }
             QFrame#card { border: 1px solid #dfe0e7; border-radius: 24px; background: #f4f4f7; }
-            QPushButton#navActive { background: #efeff4; border: none; border-left: 3px solid #7282ff; border-radius: 8px; padding-left: 16px; text-align: left; font-size: 13px; font-weight: 800; color: #111111; min-height: 38px; }
-            QPushButton#navIdle { background: transparent; border: none; border-left: 3px solid transparent; border-radius: 8px; padding-left: 16px; text-align: left; font-size: 13px; font-weight: 700; color: #77777f; min-height: 38px; }
             QPushButton#outlineButton { background: #ffffff; border: 1px solid #d8d8dd; border-radius: 2px; min-height: 22px; padding: 1px 8px; font-size: 10px; color: #7a7a80; }
             QPushButton#dangerButton { background: #ffffff; border: 1px solid #e14747; border-radius: 5px; min-height: 22px; padding: 1px 8px; font-size: 10px; font-weight: 700; color: #e14747; }
             QComboBox { background: #ffffff; border: 1px solid #d8d8dd; border-radius: 2px; min-height: 22px; padding: 1px 8px; font-size: 10px; color: #73737a; }
@@ -551,10 +584,10 @@ class MainWindow(QMainWindow):
         self.page_stack.setCurrentIndex(index)
         for name, button in self.nav_buttons.items():
             active = name == page
-            button.setObjectName("navActive" if active else "navIdle")
-            button.style().unpolish(button)
-            button.style().polish(button)
-            button.setChecked(active)
+            if isinstance(button, NavButton):
+                button.set_active(active)
+            else:
+                button.setChecked(active)
 
     def _update_launch_button(self) -> None:
         button = self.controls["launch"]
