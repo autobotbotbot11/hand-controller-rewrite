@@ -127,6 +127,9 @@ class ToggleSwitch(QCheckBox):
     def sizeHint(self) -> QSize:  # noqa: N802
         return QSize(42, 22)
 
+    def hitButton(self, pos) -> bool:  # noqa: N802
+        return self.rect().contains(pos)
+
     def paintEvent(self, event) -> None:  # noqa: N802
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
