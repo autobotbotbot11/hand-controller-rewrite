@@ -92,14 +92,14 @@ class OverlayWindow(QWidget):
     def _selfie_target_rect(self) -> QRect:
         margin = 20
         x = margin
-        y = 110
+        y = margin
         if self.settings.selfie_position == "top_right":
             x = self.width() - self.settings.selfie_width_px - margin
         elif self.settings.selfie_position == "bottom_left":
-            y = self.height() - self.settings.selfie_height_px - 48
+            y = self.height() - self.settings.selfie_height_px - margin
         elif self.settings.selfie_position == "bottom_right":
             x = self.width() - self.settings.selfie_width_px - margin
-            y = self.height() - self.settings.selfie_height_px - 48
+            y = self.height() - self.settings.selfie_height_px - margin
         return QRect(x, y, self.settings.selfie_width_px, self.settings.selfie_height_px)
 
     def _draw_selfie_placeholder(self, painter: QPainter, target: QRect) -> None:
