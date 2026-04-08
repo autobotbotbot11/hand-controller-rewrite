@@ -122,10 +122,10 @@ class ToggleSwitch(QCheckBox):
     def __init__(self) -> None:
         super().__init__()
         self.setCursor(Qt.PointingHandCursor)
-        self.setFixedSize(48, 26)
+        self.setFixedSize(42, 22)
 
     def sizeHint(self) -> QSize:  # noqa: N802
-        return QSize(48, 26)
+        return QSize(42, 22)
 
     def paintEvent(self, event) -> None:  # noqa: N802
         painter = QPainter(self)
@@ -239,6 +239,7 @@ class MainWindow(QMainWindow):
         content.setLayout(content_layout)
 
         self.page_stack = QStackedWidget()
+        self.page_stack.setObjectName("pageStack")
         self.page_stack.addWidget(self._page_general())
         self.page_stack.addWidget(self._page_camera())
         self.page_stack.addWidget(self._page_display())
@@ -253,21 +254,22 @@ class MainWindow(QMainWindow):
             """
             QWidget { background: #f8f8fb; color: #111111; font-family: "Segoe UI"; }
             QFrame { background: #ffffff; }
-            QFrame#sidebarFrame { background: #fbfbfc; border-right: 1px solid #d9dbe3; }
+            QFrame#sidebarFrame { background: #ffffff; border-right: 1px solid #d9dbe3; }
             QFrame#contentFrame { background: #f8f8fb; }
+            QStackedWidget#pageStack { background: #f8f8fb; }
             QWidget#pageShell, QWidget#scrollInner, QWidget#rowWrapper { background: transparent; }
             QLabel#logoLabel { margin-bottom: 10px; }
             QLabel#sectionHeader { font-size: 14px; font-weight: 800; letter-spacing: 0.3px; background: transparent; }
             QLabel#pageTitle { font-size: 18px; font-weight: 800; margin: 0 0 6px 2px; background: transparent; }
             QLabel#fieldLabel { font-size: 14px; font-weight: 700; background: transparent; }
             QLabel#valueLabel { font-size: 11px; color: #b5b5bc; background: transparent; }
-            QScrollArea { border: none; background: transparent; }
+            QScrollArea, QScrollArea > QWidget, QScrollArea > QWidget > QWidget { border: none; background: #f8f8fb; }
             QFrame#card { border: 1px solid #dfe0e7; border-radius: 24px; background: #f4f4f7; }
             QPushButton#navActive { background: #efeff4; border: none; border-left: 3px solid #7282ff; border-radius: 8px; padding-left: 16px; text-align: left; font-size: 13px; font-weight: 800; color: #111111; min-height: 38px; }
             QPushButton#navIdle { background: transparent; border: none; border-left: 3px solid transparent; border-radius: 8px; padding-left: 16px; text-align: left; font-size: 13px; font-weight: 700; color: #77777f; min-height: 38px; }
-            QPushButton#outlineButton { background: #ffffff; border: 1px solid #d8d8dd; border-radius: 3px; min-height: 28px; padding: 2px 10px; font-size: 12px; color: #7a7a80; }
-            QPushButton#dangerButton { background: #ffffff; border: 1px solid #e14747; border-radius: 6px; min-height: 30px; padding: 3px 12px; font-size: 12px; font-weight: 700; color: #e14747; }
-            QComboBox { background: #ffffff; border: 1px solid #d8d8dd; border-radius: 2px; min-height: 28px; padding: 2px 8px; font-size: 12px; color: #73737a; }
+            QPushButton#outlineButton { background: #ffffff; border: 1px solid #d8d8dd; border-radius: 2px; min-height: 22px; padding: 1px 8px; font-size: 10px; color: #7a7a80; }
+            QPushButton#dangerButton { background: #ffffff; border: 1px solid #e14747; border-radius: 5px; min-height: 22px; padding: 1px 8px; font-size: 10px; font-weight: 700; color: #e14747; }
+            QComboBox { background: #ffffff; border: 1px solid #d8d8dd; border-radius: 2px; min-height: 22px; padding: 1px 8px; font-size: 10px; color: #73737a; }
             QSlider::groove:horizontal { height: 4px; background: #d7d9e2; border-radius: 2px; }
             QSlider::sub-page:horizontal { background: #9aa5ff; border-radius: 2px; }
             QSlider::handle:horizontal { background: #d9d9dd; width: 14px; margin: -6px 0; border-radius: 7px; border: 1px solid #ccced4; }
@@ -327,7 +329,10 @@ class MainWindow(QMainWindow):
         page.setLayout(layout)
 
         scroll = QScrollArea()
+        scroll.setObjectName("pageScroll")
         scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.viewport().setAutoFillBackground(False)
         inner = QWidget()
         inner.setObjectName("scrollInner")
         inner_layout = QVBoxLayout()
@@ -424,17 +429,17 @@ class MainWindow(QMainWindow):
 
     def _page_general(self) -> QWidget:
         card, layout = self._card()
-        lang = self._combo("language")
+        lang = self._combo("language", width=104)
         lang.addItems(["English"])
         lang.currentTextChanged.connect(lambda text: self._update_general(language=text))
         self._row(layout, "Language", lang)
 
-        theme = self._combo("theme")
+        theme = self._combo("theme", width=134)
         theme.addItems(["System Default", "Light"])
         theme.currentTextChanged.connect(lambda text: self._update_general(theme=text))
         self._row(layout, "Theme", theme)
 
-        manual = self._outline("manual", "OPEN", width=72)
+        manual = self._outline("manual", "OPEN", width=58)
         manual.clicked.connect(lambda: QMessageBox.information(self, "User Manual", "Placeholder pa lang ito."))
         self._row(layout, "User Manual", manual)
 
@@ -442,7 +447,7 @@ class MainWindow(QMainWindow):
         minimize_after_launch.toggled.connect(lambda checked: self._update_general(minimize_after_launch=checked))
         self._row(layout, "Minimize After Launch", minimize_after_launch, help_key="minimize_after_launch")
 
-        reset = self._outline("reset", "Reset", danger=True, width=72)
+        reset = self._outline("reset", "Reset", danger=True, width=58)
         reset.clicked.connect(self._reset_to_factory_defaults)
         self._row(layout, "Reset to Default", reset)
         return self._make_page("General", card)
@@ -453,7 +458,7 @@ class MainWindow(QMainWindow):
         camera_enable.toggled.connect(lambda checked: self._update_camera(enabled=checked))
         self._row(layout, "Enable Camera", camera_enable, help_key="camera_enable")
 
-        source = self._combo("camera_source")
+        source = self._combo("camera_source", width=138)
         for label, index in self.camera_sources:
             source.addItem(label, index)
         source.currentIndexChanged.connect(self._camera_source_changed)
