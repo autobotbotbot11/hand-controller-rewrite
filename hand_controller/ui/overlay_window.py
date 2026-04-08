@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt5.QtCore import QRect, Qt, pyqtSlot
-from PyQt5.QtGui import QBrush, QColor, QFont, QImage, QPainter, QPen
+from PyQt5.QtCore import QRect, QRectF, Qt, pyqtSlot
+from PyQt5.QtGui import QBrush, QColor, QFont, QImage, QPainter, QPainterPath, QPen
 from PyQt5.QtWidgets import QApplication, QWidget
 
 from ..config.settings import KeyboardConfig
@@ -37,6 +37,13 @@ class OverlayWindow(QWidget):
         self.payload = payload
         self.update()
 
+    @pyqtSlot(object)
+    def apply_settings(self, settings: object) -> None:
+        if not isinstance(settings, KeyboardConfig):
+            return
+        self.settings = settings
+        self.update()
+
     def paintEvent(self, event) -> None:  # noqa: N802
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
@@ -48,9 +55,6 @@ class OverlayWindow(QWidget):
         if self.settings.show_pointers:
             self._draw_pointers(painter)
         self._draw_gesture_command(painter)
-        self._draw_header(painter)
-        self._draw_status(painter)
-        self._draw_footer(painter)
 
     def _draw_keyboard(self, painter: QPainter) -> None:
         painter.setFont(QFont("Arial", self.settings.key_label_font_px))
@@ -85,47 +89,47 @@ class OverlayWindow(QWidget):
                 painter.drawText(pointer.x + radius + 3, pointer.y - max(4, radius // 2), pointer.hand_label)
                 painter.setPen(QPen(QColor(0, 255, 255, 230), self.settings.pointer_stroke_px))
 
-    def _draw_header(self, painter: QPainter) -> None:
-        painter.setFont(QFont("Arial", self.settings.header_font_px))
-        painter.setPen(QColor(255, 255, 255, 230))
-        header = f"mode: {self.payload.mode}    control: {'on' if self.payload.control_enabled else 'off'}"
-        if self.payload.profile_label:
-            header += f"    profile: {self.payload.profile_label}"
-        painter.drawText(20, 34, header)
+    def _selfie_target_rect(self) -> QRect:
+        margin = 20
+        x = margin
+        y = 110
+        if self.settings.selfie_position == "top_right":
+            x = self.width() - self.settings.selfie_width_px - margin
+        elif self.settings.selfie_position == "bottom_left":
+            y = self.height() - self.settings.selfie_height_px - 48
+        elif self.settings.selfie_position == "bottom_right":
+            x = self.width() - self.settings.selfie_width_px - margin
+            y = self.height() - self.settings.selfie_height_px - 48
+        return QRect(x, y, self.settings.selfie_width_px, self.settings.selfie_height_px)
 
-    def _draw_status(self, painter: QPainter) -> None:
-        lines = []
-        if self.payload.mode == "mouse" and self.payload.mouse_status:
-            lines.append(self.payload.mouse_status)
-        if self.payload.mode == "keyboard" and self.payload.keyboard_status:
-            lines.append(self.payload.keyboard_status)
-        lines.extend(self.payload.debug_tags)
+    def _draw_selfie_placeholder(self, painter: QPainter, target: QRect) -> None:
+        painter.save()
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setPen(QPen(QColor(255, 255, 255, 235), 2))
+        painter.setBrush(Qt.NoBrush)
 
-        if not lines:
-            return
+        icon_w = min(72, max(40, target.width() // 3))
+        icon_h = int(icon_w * 0.7)
+        body = QRectF(
+            target.center().x() - icon_w / 2,
+            target.center().y() - icon_h / 2,
+            icon_w,
+            icon_h,
+        )
+        painter.drawRoundedRect(body, 8, 8)
 
-        x = 20
-        y = 64
-        width = min(self.width() - 40, self.settings.status_panel_max_width_px)
-        height = 30 + max(0, len(lines) - 1) * self.settings.status_line_height_px
-        rect = QRect(x, y, width, height)
-        painter.setBrush(QBrush(QColor(0, 0, 0, 150)))
-        painter.setPen(QPen(QColor(0, 0, 0, 0), 0))
-        painter.drawRect(rect)
+        lens_size = min(icon_h * 0.45, icon_w * 0.34)
+        lens = QRectF(
+            target.center().x() - lens_size / 2,
+            target.center().y() - lens_size / 2,
+            lens_size,
+            lens_size,
+        )
+        painter.drawEllipse(lens)
 
-        painter.setFont(QFont("Arial", self.settings.status_font_px))
-        painter.setPen(QColor(255, 235, 190, 240))
-        line_y = y + 20
-        for line in lines:
-            painter.drawText(x + 10, line_y, line)
-            line_y += self.settings.status_line_height_px
-
-    def _draw_footer(self, painter: QPainter) -> None:
-        if not self.payload.footer_hint:
-            return
-        painter.setFont(QFont("Arial", self.settings.footer_font_px))
-        painter.setPen(QColor(190, 190, 190, 220))
-        painter.drawText(20, self.height() - 24, self.payload.footer_hint)
+        top = QRectF(body.left() + icon_w * 0.18, body.top() - 10, icon_w * 0.36, 10)
+        painter.drawRoundedRect(top, 5, 5)
+        painter.restore()
 
     def _draw_gesture_command(self, painter: QPainter) -> None:
         if not self.settings.show_gesture_command or not self.payload.gesture_command_text:
@@ -157,27 +161,32 @@ class OverlayWindow(QWidget):
     def _draw_selfie(self, painter: QPainter) -> None:
         if not self.settings.show_selfie:
             return
+        target = self._selfie_target_rect()
+
+        painter.save()
+        painter.setRenderHint(QPainter.Antialiasing)
+        panel_path = QPainterPath()
+        panel_path.addRoundedRect(QRectF(target), 18, 18)
+        painter.setPen(QPen(QColor(255, 255, 255, 75), 1))
+        painter.setBrush(QBrush(QColor(0, 0, 0, 230)))
+        painter.drawPath(panel_path)
+
         frame = self.payload.selfie_frame
-        if frame is None:
-            return
+        if frame is not None:
+            try:
+                import cv2
+            except ModuleNotFoundError:
+                frame = None
 
-        try:
-            import cv2
-        except ModuleNotFoundError:
-            return
-
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        h, w, ch = rgb.shape
-        qimg = QImage(rgb.data, w, h, ch * w, QImage.Format_RGB888)
-        margin = 20
-        x = margin
-        y = 110
-        if self.settings.selfie_position == "top_right":
-            x = self.width() - self.settings.selfie_width_px - margin
-        elif self.settings.selfie_position == "bottom_left":
-            y = self.height() - self.settings.selfie_height_px - 48
-        elif self.settings.selfie_position == "bottom_right":
-            x = self.width() - self.settings.selfie_width_px - margin
-            y = self.height() - self.settings.selfie_height_px - 48
-        target = QRect(x, y, self.settings.selfie_width_px, self.settings.selfie_height_px)
-        painter.drawImage(target, qimg)
+        if frame is not None:
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            h, w, ch = rgb.shape
+            qimg = QImage(rgb.data, w, h, ch * w, QImage.Format_RGB888)
+            inset = target.adjusted(3, 3, -3, -3)
+            clip_path = QPainterPath()
+            clip_path.addRoundedRect(QRectF(inset), 15, 15)
+            painter.setClipPath(clip_path)
+            painter.drawImage(inset, qimg)
+        else:
+            self._draw_selfie_placeholder(painter, target)
+        painter.restore()

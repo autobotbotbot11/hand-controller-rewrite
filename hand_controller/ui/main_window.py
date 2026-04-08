@@ -677,6 +677,7 @@ class MainWindow(QMainWindow):
         self._mouse_sensitivity_changed(self.controls["mouse_sensitivity"].value())
         self._mouse_smoothness_changed(self.controls["mouse_smoothness"].value())
         self._mouse_dead_zone_changed(self.controls["mouse_dead_zone"].value())
+        self._push_live_overlay_settings()
         self._update_launch_button()
 
     def _update_general(self, **kwargs) -> None:
@@ -687,9 +688,18 @@ class MainWindow(QMainWindow):
 
     def _update_keyboard(self, **kwargs) -> None:
         self.working_config = replace(self.working_config, keyboard=replace(self.working_config.keyboard, **kwargs))
+        self._push_live_overlay_settings()
 
     def _update_mouse_motion(self, **kwargs) -> None:
         self.working_config = replace(self.working_config, mouse_motion=replace(self.working_config.mouse_motion, **kwargs))
+
+    def _push_live_overlay_settings(self) -> None:
+        if not self.running or self.overlay_bus is None:
+            return
+        try:
+            self.overlay_bus.update_overlay_settings.emit(self.working_config.keyboard)
+        except Exception:
+            pass
 
     def _camera_source_changed(self, index: int) -> None:
         value = self.controls["camera_source"].itemData(index)
@@ -757,6 +767,7 @@ class MainWindow(QMainWindow):
         self.overlay = OverlayWindow(launch_config.keyboard)
         self.overlay_bus = OverlaySignalBus()
         self.overlay_bus.update_overlay.connect(self.overlay.apply_payload)
+        self.overlay_bus.update_overlay_settings.connect(self.overlay.apply_settings)
         self.stop_event = threading.Event()
         self.worker_thread = threading.Thread(
             target=self.worker_fn,
@@ -779,6 +790,10 @@ class MainWindow(QMainWindow):
         if self.overlay_bus is not None and self.overlay is not None:
             try:
                 self.overlay_bus.update_overlay.disconnect(self.overlay.apply_payload)
+            except Exception:
+                pass
+            try:
+                self.overlay_bus.update_overlay_settings.disconnect(self.overlay.apply_settings)
             except Exception:
                 pass
         if self.overlay is not None:
