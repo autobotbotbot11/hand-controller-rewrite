@@ -56,109 +56,121 @@ HELP_TEXT = {
 }
 
 LIGHT_THEME = {
-    "sidebar_bg": "#ffffff",
-    "sidebar_border": "#d9dbe3",
-    "content_bg": "#f8f8fb",
-    "page_bg": "#f8f8fb",
-    "frame_bg": "#ffffff",
-    "card_bg": "#f4f4f7",
-    "card_border": "#dfe0e7",
-    "text_primary": "#111111",
-    "text_secondary": "#77777f",
-    "value_text": "#b5b5bc",
+    "sidebar_bg": "#1e2433",
+    "sidebar_border": "#2c3347",
+    "content_bg": "#f4f1eb",
+    "page_bg": "#f4f1eb",
+    "frame_bg": "#f4f1eb",
+    "card_bg": "#fffdf9",
+    "card_border": "#e2ddd6",
+    "text_primary": "#1a1a24",
+    "text_secondary": "#6b6860",
+    "value_text": "#9a9389",
     "outline_bg": "#ffffff",
-    "outline_border": "#d8d8dd",
-    "outline_text": "#7a7a80",
-    "danger_border": "#e14747",
-    "danger_text": "#e14747",
+    "outline_border": "#d9d5ce",
+    "outline_text": "#5a5650",
+    "outline_hover_bg": "#f7f3ee",
+    "outline_hover_border": "#cdc6bc",
+    "outline_hover_text": "#444038",
+    "danger_border": "#d63030",
+    "danger_text": "#b52020",
+    "danger_hover_bg": "#fff3f1",
+    "danger_hover_border": "#cb4242",
+    "danger_hover_text": "#a81c1c",
     "combo_bg": "#ffffff",
-    "combo_border": "#d8d8dd",
-    "combo_text": "#73737a",
-    "combo_arrow": "#5b5b62",
+    "combo_border": "#d9d5ce",
+    "combo_text": "#2c2a26",
+    "combo_arrow": "#3d7a60",
     "combo_popup_bg": "#ffffff",
-    "combo_popup_border": "#d8d8dd",
-    "combo_popup_text": "#2c2c34",
-    "combo_popup_sel_bg": "#eef1ff",
-    "combo_popup_sel_text": "#111111",
-    "slider_groove": "#d7d9e2",
-    "slider_fill": "#9aa5ff",
-    "slider_handle": "#d9d9dd",
-    "slider_handle_border": "#ccced4",
-    "accent": "#7282ff",
-    "accent2": "#9aa5ff",
-    "help_border": "#1b1b1b",
-    "help_text": "#1b1b1b",
-    "help_bg": "#eef1ff",
-    "help_hover_bg": "#dde4ff",
+    "combo_popup_border": "#d9d5ce",
+    "combo_popup_text": "#2c2a26",
+    "combo_popup_sel_bg": "#e8f2ed",
+    "combo_popup_sel_text": "#1a1a24",
+    "slider_groove": "#dedad4",
+    "slider_fill": "#5db890",
+    "slider_handle": "#ffffff",
+    "slider_handle_border": "#d0c8bc",
+    "accent": "#3d7a60",
+    "accent2": "#5db890",
+    "help_border": "#3d7a60",
+    "help_text": "#3d7a60",
+    "help_bg": "#e8f2ed",
+    "help_hover_bg": "#c8e4d8",
     "tooltip_bg": "#ffffff",
-    "tooltip_border": "#d8d8dd",
-    "tooltip_text": "#111111",
-    "nav_active_bg": "#efeff4",
-    "nav_indicator": "#7282ff",
-    "nav_text_active": "#111111",
-    "nav_text_inactive": "#77777f",
+    "tooltip_border": "#d9d5ce",
+    "tooltip_text": "#1a1a24",
+    "nav_active_bg": "#2e3a50",
+    "nav_indicator": "#eef0f5",
+    "nav_text_active": "#eef0f5",
+    "nav_text_inactive": "#8891a8",
     "launch_fill": "#ececef",
     "launch_text": "#111111",
-    "stop_fill": "#eee5e5",
-    "stop_text": "#111111",
-    "close_fill": "#efeff1",
-    "close_text": "#111111",
-    "toggle_off_track": "#d2d2d7",
-    "toggle_off_border": "#cdced3",
-    "toggle_off_knob": "#f4f4f6",
+    "stop_fill": "#f8eaea",
+    "stop_text": "#b52020",
+    "close_fill": "#2e3a50",
+    "close_text": "#c5cdd8",
+    "toggle_off_track": "#d5d0c8",
+    "toggle_off_border": "#c2bdb5",
+    "toggle_off_knob": "#ffffff",
 }
 
 DARK_THEME = {
-    "sidebar_bg": "#232323",
-    "sidebar_border": "#2f2f33",
-    "content_bg": "#1b1b1b",
-    "page_bg": "#1b1b1b",
-    "frame_bg": "#1b1b1b",
-    "card_bg": "#1f1f1f",
-    "card_border": "#2f2f33",
-    "text_primary": "#f4f4f6",
-    "text_secondary": "#6f6f74",
-    "value_text": "#66666d",
-    "outline_bg": "#1b1b1b",
-    "outline_border": "#2f2f33",
-    "outline_text": "#8d8d94",
-    "danger_border": "#a42828",
-    "danger_text": "#ff3e3e",
-    "combo_bg": "#1b1b1b",
-    "combo_border": "#2f2f33",
-    "combo_text": "#9d9da4",
-    "combo_arrow": "#9d9da4",
+    "sidebar_bg": "#18181c",
+    "sidebar_border": "#28282e",
+    "content_bg": "#111115",
+    "page_bg": "#111115",
+    "frame_bg": "#111115",
+    "card_bg": "#1c1e40",
+    "card_border": "#35386b",
+    "text_primary": "#f0f0f6",
+    "text_secondary": "#6a6a78",
+    "value_text": "#6a6a78",
+    "outline_bg": "#1c1c22",
+    "outline_border": "#30303a",
+    "outline_text": "#8d8d9a",
+    "outline_hover_bg": "#23232b",
+    "outline_hover_border": "#40404c",
+    "outline_hover_text": "#b7b7c8",
+    "danger_border": "#9b2828",
+    "danger_text": "#ff5555",
+    "danger_hover_bg": "#251a1b",
+    "danger_hover_border": "#ba3838",
+    "danger_hover_text": "#ff7676",
+    "combo_bg": "#1c1c22",
+    "combo_border": "#30303a",
+    "combo_text": "#9898a8",
+    "combo_arrow": "#9898a8",
     "combo_popup_bg": "#1c1c22",
-    "combo_popup_border": "#2f2f33",
+    "combo_popup_border": "#30303a",
     "combo_popup_text": "#d0d0e0",
     "combo_popup_sel_bg": "#2a2a38",
-    "combo_popup_sel_text": "#f4f4f6",
-    "slider_groove": "#2a2a2d",
-    "slider_fill": "#4e59ff",
-    "slider_handle": "#d9d9dd",
+    "combo_popup_sel_text": "#f0f0f6",
+    "slider_groove": "#26262e",
+    "slider_fill": "#6272ff",
+    "slider_handle": "#e0e0e8",
     "slider_handle_border": "#d0d0d4",
     "accent": "#6272ff",
     "accent2": "#a78bfa",
-    "help_border": "#f4f4f6",
-    "help_text": "#f4f4f6",
+    "help_border": "#9898b8",
+    "help_text": "#9898b8",
     "help_bg": "#2a2a36",
     "help_hover_bg": "#383848",
-    "tooltip_bg": "#262626",
-    "tooltip_border": "#3a3a3f",
-    "tooltip_text": "#f4f4f6",
-    "nav_active_bg": "#2a2a2a",
+    "tooltip_bg": "#242430",
+    "tooltip_border": "#383848",
+    "tooltip_text": "#f0f0f6",
+    "nav_active_bg": "#22222c",
     "nav_indicator": "#f1f2ff",
-    "nav_text_active": "#f4f4f6",
-    "nav_text_inactive": "#6f6f74",
+    "nav_text_active": "#f0f0f6",
+    "nav_text_inactive": "#55556a",
     "launch_fill": "#ffffff",
     "launch_text": "#111111",
-    "stop_fill": "#35292a",
-    "stop_text": "#f4f4f6",
-    "close_fill": "#2a2a2d",
-    "close_text": "#c9c9cf",
-    "toggle_off_track": "#252527",
-    "toggle_off_border": "#2f2f33",
-    "toggle_off_knob": "#d9d9dd",
+    "stop_fill": "#2e1e1e",
+    "stop_text": "#ff8888",
+    "close_fill": "#222228",
+    "close_text": "#aaaabc",
+    "toggle_off_track": "#26262e",
+    "toggle_off_border": "#30303a",
+    "toggle_off_knob": "#d0d0e0",
 }
 
 
@@ -206,7 +218,10 @@ class SidebarPillButton(QPushButton):
 
         if self.launch and self.icon_kind == "play":
             fill = QColor(colors["launch_fill"])
-            text_color = QColor(colors["launch_text"])
+            if getattr(self.window(), "_resolved_theme_mode", "light") == "dark":
+                text_color = QColor("#ffffff")
+            else:
+                text_color = QColor(colors["launch_text"])
         elif self.launch and self.icon_kind == "stop":
             fill = QColor(colors["stop_fill"])
             text_color = QColor(colors["stop_text"])
@@ -217,11 +232,17 @@ class SidebarPillButton(QPushButton):
             fill = fill.darker(104)
 
         painter.setPen(Qt.NoPen)
-        painter.setBrush(QBrush(fill))
+        if self.launch and self.icon_kind == "play" and getattr(self.window(), "_resolved_theme_mode", "light") == "dark":
+            gradient = QLinearGradient(rect.left(), rect.top(), rect.right(), rect.bottom())
+            gradient.setColorAt(0, QColor(colors["accent"]))
+            gradient.setColorAt(1, QColor(colors["accent2"]))
+            painter.setBrush(QBrush(gradient))
+        else:
+            painter.setBrush(QBrush(fill))
         painter.drawRoundedRect(rect, radius, radius)
 
         if self._glow > 0.01:
-            glow = QColor("#ffffff") if self.launch else QColor(colors["accent"])
+            glow = QColor("#ffffff") if (self.launch and getattr(self.window(), "_resolved_theme_mode", "light") != "dark") else QColor(colors["accent"])
             glow.setAlphaF(self._glow * (0.08 if self.launch else 0.10))
             painter.setBrush(QBrush(glow))
             painter.drawRoundedRect(rect, radius, radius)
@@ -415,6 +436,11 @@ class HelpBadge(QWidget):
 
 
 class ThemedComboBox(QComboBox):
+    def __init__(self) -> None:
+        super().__init__()
+        self.setCursor(Qt.PointingHandCursor)
+        self.setFixedHeight(24)
+
     def paintEvent(self, event) -> None:  # noqa: N802
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
@@ -481,6 +507,49 @@ class ThemedComboBox(QComboBox):
     def hidePopup(self) -> None:  # noqa: N802
         super().hidePopup()
         self.setStyleSheet("")
+
+
+class MiniActionButton(QPushButton):
+    def __init__(self, text: str, *, danger: bool = False) -> None:
+        super().__init__(text)
+        self._danger = danger
+        self._hovered = False
+        self.setCursor(Qt.PointingHandCursor)
+        self.setFlat(True)
+        self.setFixedHeight(28)
+
+    def enterEvent(self, event) -> None:  # noqa: N802
+        self._hovered = True
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:  # noqa: N802
+        self._hovered = False
+        self.update()
+        super().leaveEvent(event)
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        colors = _theme_for(self)
+        rect = QRectF(0.5, 0.5, self.width() - 1, self.height() - 1)
+
+        if self._danger:
+            fill = QColor(colors["danger_hover_bg"] if self._hovered or self.isDown() else colors["outline_bg"])
+            border = QColor(colors["danger_hover_border"] if self._hovered or self.isDown() else colors["danger_border"])
+            text = QColor(colors["danger_hover_text"] if self._hovered or self.isDown() else colors["danger_text"])
+        else:
+            fill = QColor(colors["outline_hover_bg"] if self._hovered or self.isDown() else colors["outline_bg"])
+            border = QColor(colors["outline_hover_border"] if self._hovered or self.isDown() else colors["outline_border"])
+            text = QColor(colors["outline_hover_text"] if self._hovered or self.isDown() else colors["outline_text"])
+
+        painter.setPen(QPen(border, 1.0))
+        painter.setBrush(QBrush(fill))
+        painter.drawRoundedRect(rect, 5, 5)
+
+        painter.setPen(text)
+        painter.setFont(QFont("Segoe UI", 9, QFont.Bold if self._danger else QFont.DemiBold))
+        painter.drawText(rect, Qt.AlignCenter, self.text())
 
 
 class ThinSlider(QWidget):
@@ -690,23 +759,34 @@ class MainWindow(QMainWindow):
     def _apply_window_theme(self, theme_value: str | None) -> None:
         self._resolved_theme_mode = self._resolve_theme_mode(theme_value)
         colors = DARK_THEME if self._resolved_theme_mode == "dark" else LIGHT_THEME
+        content_background = (
+            "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #171821, stop:0.52 #12131b, stop:1 #0f1016)"
+            if self._resolved_theme_mode == "dark"
+            else colors["content_bg"]
+        )
+        card_background = (
+            "qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+            "stop:0 rgba(30, 32, 74, 236), "
+            "stop:1 rgba(24, 26, 56, 232))"
+            if self._resolved_theme_mode == "dark"
+            else colors["card_bg"]
+        )
+        page_surface = "transparent" if self._resolved_theme_mode == "dark" else colors["page_bg"]
         self.setStyleSheet(
             f"""
             QWidget {{ background: {colors["page_bg"]}; color: {colors["text_primary"]}; font-family: "Segoe UI"; }}
             QFrame {{ background: {colors["frame_bg"]}; }}
             QFrame#sidebarFrame {{ background: {colors["sidebar_bg"]}; border-right: 1px solid {colors["sidebar_border"]}; }}
-            QFrame#contentFrame {{ background: {colors["content_bg"]}; }}
-            QStackedWidget#pageStack {{ background: {colors["page_bg"]}; }}
+            QFrame#contentFrame {{ background: {content_background}; }}
+            QStackedWidget#pageStack {{ background: transparent; }}
             QWidget#pageShell, QWidget#scrollInner, QWidget#rowWrapper {{ background: transparent; }}
             QLabel#logoLabel {{ margin-bottom: 10px; background: transparent; }}
             QLabel#sectionHeader {{ font-size: 13px; font-weight: 800; letter-spacing: 0.2px; color: {colors["text_primary"]}; background: transparent; }}
             QLabel#pageTitle {{ font-size: 17px; font-weight: 800; margin: 0 0 6px 2px; color: {colors["text_primary"]}; background: transparent; }}
             QLabel#fieldLabel {{ font-size: 13px; font-weight: 700; color: {colors["text_primary"]}; background: transparent; }}
             QLabel#valueLabel {{ font-size: 11px; color: {colors["value_text"]}; background: transparent; }}
-            QScrollArea, QScrollArea > QWidget, QScrollArea > QWidget > QWidget {{ border: none; background: {colors["page_bg"]}; }}
-            QFrame#card {{ border: 1px solid {colors["card_border"]}; border-radius: 24px; background: {colors["card_bg"]}; }}
-            QPushButton#outlineButton {{ background: {colors["outline_bg"]}; border: 1px solid {colors["outline_border"]}; border-radius: 2px; min-height: 22px; padding: 1px 8px; font-size: 10px; color: {colors["outline_text"]}; }}
-            QPushButton#dangerButton {{ background: {colors["outline_bg"]}; border: 1px solid {colors["danger_border"]}; border-radius: 5px; min-height: 22px; padding: 1px 8px; font-size: 10px; font-weight: 700; color: {colors["danger_text"]}; }}
+            QScrollArea, QScrollArea > QWidget, QScrollArea > QWidget > QWidget {{ border: none; background: {page_surface}; }}
+            QFrame#card {{ border: 1px solid {colors["card_border"]}; border-radius: 24px; background: {card_background}; }}
             QToolTip {{ background: {colors["tooltip_bg"]}; color: {colors["tooltip_text"]}; border: 1px solid {colors["tooltip_border"]}; padding: 5px 6px; }}
             """
         )
@@ -791,8 +871,8 @@ class MainWindow(QMainWindow):
         card.setMaximumWidth(760)
         card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         layout = QVBoxLayout()
-        layout.setContentsMargins(18, 18, 18, 18)
-        layout.setSpacing(22)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(18)
         card.setLayout(layout)
         return card, layout
 
@@ -826,9 +906,8 @@ class MainWindow(QMainWindow):
         return slider
 
     def _outline(self, key: str, text: str, *, danger: bool = False, width: int = 86) -> QPushButton:
-        button = QPushButton(text)
+        button = MiniActionButton(text, danger=danger)
         button.setFixedWidth(width)
-        button.setObjectName("dangerButton" if danger else "outlineButton")
         self.controls[key] = button
         return button
 
@@ -837,7 +916,7 @@ class MainWindow(QMainWindow):
         wrapper.setObjectName("rowWrapper")
         wrapper_layout = QVBoxLayout()
         wrapper_layout.setContentsMargins(0, 0, 0, 0)
-        wrapper_layout.setSpacing(8)
+        wrapper_layout.setSpacing(6)
         wrapper.setLayout(wrapper_layout)
 
         top = QHBoxLayout()
