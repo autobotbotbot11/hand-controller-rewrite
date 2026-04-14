@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import sys
 import threading
 from collections.abc import Callable
 from dataclasses import replace
@@ -12,6 +13,7 @@ from PyQt5.QtWidgets import (
     QButtonGroup,
     QCheckBox,
     QComboBox,
+    QDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -31,6 +33,9 @@ from PyQt5.QtWidgets import (
 from ..config.settings import AppConfig, build_factory_default_config
 from .overlay_window import OverlayWindow
 from .signals import OverlaySignalBus
+
+if sys.platform == "win32":
+    import winreg
 
 
 WorkerFn = Callable[[OverlaySignalBus, threading.Event, AppConfig, int, int], None]
@@ -116,6 +121,8 @@ LIGHT_THEME = {
     "toggle_off_knob": "#ffffff",
     "status_dot_on": "#3d9e6c",
     "status_dot_off": "#9ea8b8",
+    "dialog_bg": "#f9f6f0",
+    "dialog_border": "#d9d5ce",
     "df_bg": "#f2ede4",
     "df_orbs": [
         {"color": "#7a9e8a", "alpha": 0.13, "r_frac": 0.70},
@@ -186,6 +193,8 @@ DARK_THEME = {
     "toggle_off_knob": "#d0d0e0",
     "status_dot_on": "#22c55e",
     "status_dot_off": "#4b5563",
+    "dialog_bg": "#18181f",
+    "dialog_border": "#30303a",
     "df_bg": "#0d0d12",
     "df_orbs": [
         {"color": "#3a3f8f", "alpha": 0.18, "r_frac": 0.72},
@@ -202,6 +211,20 @@ def _theme_for(widget: QWidget) -> dict[str, str]:
     window = widget.window()
     mode = getattr(window, "_resolved_theme_mode", "light")
     return DARK_THEME if mode == "dark" else LIGHT_THEME
+
+
+def _windows_system_theme_mode() -> str | None:
+    if sys.platform != "win32":
+        return None
+    try:
+        key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+        )
+        value, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
+        return "light" if int(value) == 1 else "dark"
+    except Exception:
+        return None
 
 
 class DepthFieldBackground(QWidget):
@@ -603,6 +626,113 @@ class HelpBadge(QWidget):
         painter.drawText(QRectF(0, 0, 18, 18), Qt.AlignCenter, "?")
 
 
+class ResetConfirmDialog(QDialog):
+    def __init__(self, parent: QWidget) -> None:
+        super().__init__(parent, Qt.FramelessWindowHint | Qt.Dialog)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self._mode = getattr(parent, "_resolved_theme_mode", "light")
+        self.setFixedSize(310, 148)
+        self._build()
+        self._apply_theme()
+        parent_geometry = parent.geometry()
+        self.move(parent_geometry.center() - self.rect().center())
+
+    def _build(self) -> None:
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+
+        card = QWidget()
+        card.setObjectName("rcCard")
+        root.addWidget(card)
+
+        content = QVBoxLayout(card)
+        content.setContentsMargins(24, 22, 24, 20)
+        content.setSpacing(8)
+
+        title = QLabel("Reset to Default?")
+        title.setObjectName("rcTitle")
+        content.addWidget(title)
+
+        subtitle = QLabel("All settings will return to their original values.")
+        subtitle.setObjectName("rcSub")
+        subtitle.setWordWrap(True)
+        content.addWidget(subtitle)
+
+        content.addStretch(1)
+
+        button_row = QHBoxLayout()
+        button_row.setSpacing(10)
+
+        back_button = QPushButton("Back")
+        back_button.setObjectName("rcBack")
+        back_button.setFixedHeight(34)
+        back_button.setCursor(Qt.PointingHandCursor)
+        back_button.clicked.connect(self.reject)
+
+        apply_button = QPushButton("Apply Reset")
+        apply_button.setObjectName("rcApply")
+        apply_button.setFixedHeight(34)
+        apply_button.setCursor(Qt.PointingHandCursor)
+        apply_button.clicked.connect(self.accept)
+
+        button_row.addWidget(back_button)
+        button_row.addWidget(apply_button)
+        content.addLayout(button_row)
+
+    def _apply_theme(self) -> None:
+        colors = DARK_THEME if self._mode == "dark" else LIGHT_THEME
+        self.setStyleSheet(
+            f"""
+            QWidget#rcCard {{
+                background: {colors["dialog_bg"]};
+                border: 1px solid {colors["dialog_border"]};
+                border-radius: 14px;
+            }}
+            QLabel#rcTitle {{
+                font-family: "Segoe UI";
+                font-size: 14px;
+                font-weight: 800;
+                color: {colors["text_primary"]};
+                background: transparent;
+            }}
+            QLabel#rcSub {{
+                font-family: "Segoe UI";
+                font-size: 11px;
+                color: {colors["text_secondary"]};
+                background: transparent;
+            }}
+            QPushButton#rcBack {{
+                font-family: "Segoe UI";
+                font-size: 11px;
+                font-weight: 700;
+                background: {colors["outline_bg"]};
+                border: 1px solid {colors["outline_border"]};
+                border-radius: 8px;
+                color: {colors["outline_text"]};
+                padding: 0 14px;
+            }}
+            QPushButton#rcBack:hover {{
+                border-color: {colors["accent"]};
+                color: {colors["accent"]};
+            }}
+            QPushButton#rcApply {{
+                font-family: "Segoe UI";
+                font-size: 11px;
+                font-weight: 700;
+                border: none;
+                border-radius: 8px;
+                color: #ffffff;
+                padding: 0 14px;
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:0,
+                    stop:0 {colors["danger_border"]},
+                    stop:1 {colors["danger_text"]}
+                );
+            }}
+            """
+        )
+
+
 class ThemedComboBox(QComboBox):
     def __init__(self) -> None:
         super().__init__()
@@ -930,6 +1060,9 @@ class MainWindow(QMainWindow):
             return "dark"
         if normalized == "light":
             return "light"
+        system_mode = _windows_system_theme_mode()
+        if system_mode is not None:
+            return system_mode
         app_palette = self.palette()
         return "dark" if app_palette.color(QPalette.Window).lightness() < 128 else "light"
 
@@ -1404,6 +1537,9 @@ class MainWindow(QMainWindow):
         self._update_mouse_motion(wake_threshold_px=dead_zone, sleep_threshold_px=max(0.0, round(dead_zone * 0.4, 2)))
 
     def _reset_to_factory_defaults(self) -> None:
+        dialog = ResetConfirmDialog(self)
+        if dialog.exec_() != QDialog.Accepted:
+            return
         defaults = build_factory_default_config()
         self.working_config = replace(defaults, tuning_path=self.working_config.tuning_path)
         self._sync_widgets_from_config()

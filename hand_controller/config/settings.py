@@ -15,7 +15,7 @@ DEFAULT_FALLBACK_ARTIFACTS_DIR = REPO_ROOT.parent / "touch-v15" / "hand_controll
 @dataclass(slots=True, frozen=True)
 class GeneralConfig:
     language: str = "English"
-    theme: str = "System Default"
+    theme: str = "Dark"
     minimize_after_launch: bool = True
 
 
