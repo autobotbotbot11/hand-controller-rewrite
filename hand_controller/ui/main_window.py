@@ -22,6 +22,7 @@ from PyQt5.QtWidgets import (
     QSlider,
     QSizePolicy,
     QStackedWidget,
+    QToolTip,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -62,11 +63,11 @@ LIGHT_THEME = {
     "content_bg": "#f4f1eb",
     "page_bg": "#f4f1eb",
     "frame_bg": "#f4f1eb",
-    "card_bg": "#fffdf9",
+    "card_bg": "#fffffff8",
     "card_border": "#e2ddd6",
     "text_primary": "#1a1a24",
     "text_secondary": "#6b6860",
-    "value_text": "#9a9389",
+    "value_text": "#8a857d",
     "outline_bg": "#ffffff",
     "outline_border": "#d9d5ce",
     "outline_text": "#5a5650",
@@ -105,7 +106,7 @@ LIGHT_THEME = {
     "nav_text_active": "#eef0f5",
     "nav_text_inactive": "#8891a8",
     "launch_fill": "#ececef",
-    "launch_text": "#111111",
+    "launch_text": "#ffffff",
     "stop_fill": "#f8eaea",
     "stop_text": "#b52020",
     "close_fill": "#2e3a50",
@@ -113,6 +114,8 @@ LIGHT_THEME = {
     "toggle_off_track": "#d5d0c8",
     "toggle_off_border": "#c2bdb5",
     "toggle_off_knob": "#ffffff",
+    "status_dot_on": "#3d9e6c",
+    "status_dot_off": "#9ea8b8",
     "df_bg": "#f2ede4",
     "df_orbs": [
         {"color": "#7a9e8a", "alpha": 0.13, "r_frac": 0.70},
@@ -181,6 +184,8 @@ DARK_THEME = {
     "toggle_off_track": "#26262e",
     "toggle_off_border": "#30303a",
     "toggle_off_knob": "#d0d0e0",
+    "status_dot_on": "#22c55e",
+    "status_dot_off": "#4b5563",
     "df_bg": "#0d0d12",
     "df_orbs": [
         {"color": "#3a3f8f", "alpha": 0.18, "r_frac": 0.72},
@@ -247,17 +252,17 @@ class DepthFieldBackground(QWidget):
 
         for idx, orb_def in enumerate(colors["df_orbs"]):
             cx, cy = self._orb_centre(idx, width, height)
-            radius = min(width, height) * orb_def["r_frac"]
+            radius = min(width, height) * orb_def["r_frac"] * 1.10
             base = QColor(orb_def["color"])
             grad = QRadialGradient(QPointF(cx, cy), radius)
             inner = QColor(base)
-            inner.setAlphaF(orb_def["alpha"])
+            inner.setAlphaF(min(1.0, orb_def["alpha"] * 1.08))
             mid = QColor(base)
-            mid.setAlphaF(orb_def["alpha"] * 0.40)
+            mid.setAlphaF(orb_def["alpha"] * 0.52)
             edge = QColor(base)
             edge.setAlphaF(0.0)
             grad.setColorAt(0.0, inner)
-            grad.setColorAt(0.55, mid)
+            grad.setColorAt(0.68, mid)
             grad.setColorAt(1.0, edge)
             painter.setBrush(QBrush(grad))
             painter.drawEllipse(QPointF(cx, cy), radius, radius)
@@ -298,6 +303,45 @@ class ContentFrame(QFrame):
             self._bg.setGeometry(0, 0, self.width(), self.height())
 
 
+class StatusDot(QWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.setFixedSize(10, 10)
+        self._running = False
+        self._opacity = 1.0
+        self._rising = False
+        timer = QTimer(self)
+        timer.timeout.connect(self._pulse)
+        timer.start(30)
+        self._timer = timer
+
+    def set_running(self, running: bool) -> None:
+        self._running = running
+        self._opacity = 1.0
+        self.update()
+
+    def _pulse(self) -> None:
+        if not self._running:
+            return
+        if self._rising:
+            self._opacity = min(1.0, self._opacity + 0.03)
+            self._rising = self._opacity < 1.0
+        else:
+            self._opacity = max(0.3, self._opacity - 0.03)
+            self._rising = self._opacity <= 0.3
+        self.update()
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        colors = _theme_for(self)
+        color = QColor(colors["status_dot_on"] if self._running else colors["status_dot_off"])
+        color.setAlphaF(self._opacity if self._running else 1.0)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QBrush(color))
+        painter.drawEllipse(1, 1, 8, 8)
+
+
 class SidebarPillButton(QPushButton):
     def __init__(self, text: str, *, icon_kind: str, launch: bool) -> None:
         super().__init__(text)
@@ -336,10 +380,7 @@ class SidebarPillButton(QPushButton):
 
         if self.launch and self.icon_kind == "play":
             fill = QColor(colors["launch_fill"])
-            if getattr(self.window(), "_resolved_theme_mode", "light") == "dark":
-                text_color = QColor("#ffffff")
-            else:
-                text_color = QColor(colors["launch_text"])
+            text_color = QColor(colors["launch_text"])
         elif self.launch and self.icon_kind == "stop":
             fill = QColor(colors["stop_fill"])
             text_color = QColor(colors["stop_text"])
@@ -350,7 +391,7 @@ class SidebarPillButton(QPushButton):
             fill = fill.darker(104)
 
         painter.setPen(Qt.NoPen)
-        if self.launch and self.icon_kind == "play" and getattr(self.window(), "_resolved_theme_mode", "light") == "dark":
+        if self.launch and self.icon_kind == "play":
             gradient = QLinearGradient(rect.left(), rect.top(), rect.right(), rect.bottom())
             gradient.setColorAt(0, QColor(colors["accent"]))
             gradient.setColorAt(1, QColor(colors["accent2"]))
@@ -360,7 +401,7 @@ class SidebarPillButton(QPushButton):
         painter.drawRoundedRect(rect, radius, radius)
 
         if self._glow > 0.01:
-            glow = QColor("#ffffff") if (self.launch and getattr(self.window(), "_resolved_theme_mode", "light") != "dark") else QColor(colors["accent"])
+            glow = QColor("#ffffff") if (self.launch and self.icon_kind == "play") else QColor(colors["accent"])
             glow.setAlphaF(self._glow * (0.08 if self.launch else 0.10))
             painter.setBrush(QBrush(glow))
             painter.drawRoundedRect(rect, radius, radius)
@@ -434,7 +475,8 @@ class ToggleSwitch(QCheckBox):
         if progress > 0.01:
             gradient = QLinearGradient(track_rect.left(), 0, track_rect.right(), 0)
             off_color = QColor(colors["toggle_off_track"])
-            on_color = QColor("#19e85c")
+            on_color = QColor(colors["accent"])
+            on_color_2 = QColor(colors["accent2"])
 
             def blend(a: QColor, b: QColor, amount: float) -> QColor:
                 return QColor(
@@ -444,11 +486,11 @@ class ToggleSwitch(QCheckBox):
                 )
 
             start = blend(off_color, on_color, progress * 0.85)
-            end = blend(off_color, on_color, progress)
+            end = blend(off_color, on_color_2, progress)
             gradient.setColorAt(0, start)
             gradient.setColorAt(1, end)
             track_brush = QBrush(gradient)
-            border_color = end
+            border_color = blend(off_color, on_color, progress)
         else:
             track_brush = QBrush(QColor(colors["toggle_off_track"]))
             border_color = QColor(colors["toggle_off_border"])
@@ -527,18 +569,26 @@ class HelpBadge(QWidget):
     def __init__(self, tip: str) -> None:
         super().__init__()
         self._hovered = False
+        self._tip = tip
         self.setFixedSize(18, 18)
-        self.setCursor(Qt.PointingHandCursor)
+        self.setCursor(Qt.ArrowCursor)
         self.setToolTip(tip)
 
     def enterEvent(self, event) -> None:  # noqa: N802
         self._hovered = True
         self.update()
+        QToolTip.showText(
+            self.mapToGlobal(self.rect().bottomRight()),
+            self._tip,
+            self,
+            self.rect(),
+        )
         super().enterEvent(event)
 
     def leaveEvent(self, event) -> None:  # noqa: N802
         self._hovered = False
         self.update()
+        QToolTip.hideText()
         super().leaveEvent(event)
 
     def paintEvent(self, event) -> None:  # noqa: N802
@@ -794,6 +844,7 @@ class MainWindow(QMainWindow):
         self.controls: dict[str, QWidget] = {}
         self.value_labels: dict[str, QLabel] = {}
         self.camera_sources = self._detect_camera_sources()
+        self._status_dot: StatusDot | None = None
 
         self._init_ui()
         self._sync_widgets_from_config()
@@ -822,10 +873,16 @@ class MainWindow(QMainWindow):
         logo.setObjectName("logoLabel")
         sidebar_layout.addWidget(logo)
 
-        sidebar_layout.addWidget(self._section_header("START PROGRAM"))
+        sidebar_layout.addWidget(self._section_header("PROGRAM"))
+        launch_row = QHBoxLayout()
+        launch_row.setContentsMargins(0, 0, 0, 0)
+        launch_row.setSpacing(8)
+        self._status_dot = StatusDot()
         self.controls["launch"] = self._pill_button(self.start_button_label.upper(), launch=True)
         self.controls["launch"].clicked.connect(self.toggle_worker)
-        sidebar_layout.addWidget(self.controls["launch"])
+        launch_row.addWidget(self._status_dot, 0, Qt.AlignVCenter)
+        launch_row.addWidget(self.controls["launch"], 1)
+        sidebar_layout.addLayout(launch_row)
 
         sidebar_layout.addSpacing(22)
         sidebar_layout.addWidget(self._section_header("NAVIGATE"))
@@ -895,8 +952,9 @@ class MainWindow(QMainWindow):
             QStackedWidget#pageStack {{ background: transparent; }}
             QWidget#pageShell, QWidget#scrollInner, QWidget#rowWrapper {{ background: transparent; }}
             QLabel#logoLabel {{ margin-bottom: 10px; background: transparent; }}
-            QLabel#sectionHeader {{ font-size: 13px; font-weight: 800; letter-spacing: 0.2px; color: {colors["text_primary"]}; background: transparent; }}
-            QLabel#pageTitle {{ font-size: 17px; font-weight: 800; margin: 0 0 6px 2px; color: {colors["text_primary"]}; background: transparent; }}
+            QLabel#sectionHeader {{ font-size: 9px; font-weight: 800; letter-spacing: 1.4px; color: {colors["text_secondary"]}; background: transparent; }}
+            QLabel#pageTitle {{ font-size: 22px; font-weight: 800; margin: 0 0 2px 2px; color: {colors["text_primary"]}; background: transparent; }}
+            QLabel#pageSubtitle {{ font-size: 12px; color: {colors["text_secondary"]}; background: transparent; margin-bottom: 10px; }}
             QLabel#fieldLabel {{ font-size: 13px; font-weight: 700; color: {colors["text_primary"]}; background: transparent; }}
             QLabel#valueLabel {{ font-size: 11px; color: {colors["value_text"]}; background: transparent; }}
             QScrollArea, QScrollArea > QWidget, QScrollArea > QWidget > QWidget {{ border: none; background: {page_surface}; }}
@@ -952,7 +1010,7 @@ class MainWindow(QMainWindow):
         )
         return button
 
-    def _make_page(self, title: str, card: QWidget) -> QWidget:
+    def _make_page(self, title: str, subtitle: str, card: QWidget) -> QWidget:
         page = QWidget()
         page.setObjectName("pageShell")
         layout = QVBoxLayout()
@@ -973,7 +1031,10 @@ class MainWindow(QMainWindow):
 
         title_label = QLabel(title)
         title_label.setObjectName("pageTitle")
+        subtitle_label = QLabel(subtitle)
+        subtitle_label.setObjectName("pageSubtitle")
         inner_layout.addWidget(title_label)
+        inner_layout.addWidget(subtitle_label)
         inner_layout.addWidget(card, 0, Qt.AlignTop)
         inner_layout.addStretch(1)
 
@@ -1076,7 +1137,7 @@ class MainWindow(QMainWindow):
         reset = self._outline("reset", "Reset", danger=True, width=58)
         reset.clicked.connect(self._reset_to_factory_defaults)
         self._row(layout, "Reset to Default", reset)
-        return self._make_page("General", card)
+        return self._make_page("General", "App preferences & defaults", card)
 
     def _page_camera(self) -> QWidget:
         card, layout = self._card()
@@ -1089,7 +1150,7 @@ class MainWindow(QMainWindow):
             source.addItem(label, index)
         source.currentIndexChanged.connect(self._camera_source_changed)
         self._row(layout, "Camera Source", source, help_key="camera_source")
-        return self._make_page("Camera", card)
+        return self._make_page("Camera", "Input device configuration", card)
 
     def _page_display(self) -> QWidget:
         card, layout = self._card()
@@ -1128,7 +1189,7 @@ class MainWindow(QMainWindow):
             gesture_position.addItem(label, value)
         gesture_position.currentIndexChanged.connect(self._gesture_command_position_changed)
         self._row(layout, "Gesture Command Position", gesture_position, help_key="gesture_command_position")
-        return self._make_page("Display", card)
+        return self._make_page("Display", "Overlay appearance settings", card)
 
     def _page_keyboard(self) -> QWidget:
         card, layout = self._card()
@@ -1147,7 +1208,7 @@ class MainWindow(QMainWindow):
         keyboard_enable = self._switch("keyboard_enable")
         keyboard_enable.toggled.connect(lambda checked: self._update_keyboard(virtual_keyboard_enabled=checked))
         self._row(layout, "Enable Virtual Keyboard Control", keyboard_enable, help_key="keyboard_enable")
-        return self._make_page("Keyboard", card)
+        return self._make_page("Keyboard", "Virtual keyboard tap settings", card)
 
     def _page_mouse(self) -> QWidget:
         card, layout = self._card()
@@ -1168,7 +1229,7 @@ class MainWindow(QMainWindow):
         dead_zone = self._slider("mouse_dead_zone", 0, 100)
         dead_zone.valueChanged.connect(self._mouse_dead_zone_changed)
         self._row(layout, "Dead Zone", dead_zone, help_key="mouse_dead_zone", value_label=dead_value, slider=True)
-        return self._make_page("Mouse", card)
+        return self._make_page("Mouse", "Cursor movement & feel", card)
 
     def _set_active_page(self, page: str) -> None:
         if self.page_stack is None:
@@ -1187,6 +1248,8 @@ class MainWindow(QMainWindow):
         button.setText(self.stop_button_label.upper() if self.running else self.start_button_label.upper())
         if isinstance(button, SidebarPillButton):
             button.set_icon_kind("stop" if self.running else "play")
+        if self._status_dot is not None:
+            self._status_dot.set_running(self.running)
         button.setProperty("running", "true" if self.running else "false")
         button.style().unpolish(button)
         button.style().polish(button)
