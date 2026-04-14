@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import math
 import threading
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
 from PyQt5.QtCore import QPointF, QRectF, QSize, Qt, QTimer, pyqtSignal, pyqtSlot
-from PyQt5.QtGui import QBrush, QColor, QFont, QLinearGradient, QPainter, QPalette, QPen, QPixmap, QPolygonF
+from PyQt5.QtGui import QBrush, QColor, QFont, QLinearGradient, QPainter, QPalette, QPen, QPixmap, QPolygonF, QRadialGradient
 from PyQt5.QtWidgets import (
     QButtonGroup,
     QCheckBox,
@@ -112,6 +113,15 @@ LIGHT_THEME = {
     "toggle_off_track": "#d5d0c8",
     "toggle_off_border": "#c2bdb5",
     "toggle_off_knob": "#ffffff",
+    "df_bg": "#f2ede4",
+    "df_orbs": [
+        {"color": "#7a9e8a", "alpha": 0.13, "r_frac": 0.70},
+        {"color": "#5a7a8e", "alpha": 0.10, "r_frac": 0.62},
+        {"color": "#9aaa88", "alpha": 0.09, "r_frac": 0.78},
+    ],
+    "df_line": "#3d7a60",
+    "df_line_alpha": 0.028,
+    "df_line_spacing": 28,
 }
 
 DARK_THEME = {
@@ -120,8 +130,8 @@ DARK_THEME = {
     "content_bg": "#111115",
     "page_bg": "#111115",
     "frame_bg": "#111115",
-    "card_bg": "#1c1e40",
-    "card_border": "#35386b",
+    "card_bg": "#1c1c22ee",
+    "card_border": "#28282e",
     "text_primary": "#f0f0f6",
     "text_secondary": "#6a6a78",
     "value_text": "#6a6a78",
@@ -171,6 +181,15 @@ DARK_THEME = {
     "toggle_off_track": "#26262e",
     "toggle_off_border": "#30303a",
     "toggle_off_knob": "#d0d0e0",
+    "df_bg": "#0d0d12",
+    "df_orbs": [
+        {"color": "#3a3f8f", "alpha": 0.18, "r_frac": 0.72},
+        {"color": "#5c3f8a", "alpha": 0.13, "r_frac": 0.60},
+        {"color": "#1a2a6e", "alpha": 0.12, "r_frac": 0.80},
+    ],
+    "df_line": "#6272ff",
+    "df_line_alpha": 0.030,
+    "df_line_spacing": 28,
 }
 
 
@@ -178,6 +197,105 @@ def _theme_for(widget: QWidget) -> dict[str, str]:
     window = widget.window()
     mode = getattr(window, "_resolved_theme_mode", "light")
     return DARK_THEME if mode == "dark" else LIGHT_THEME
+
+
+class DepthFieldBackground(QWidget):
+    TICK_MS = 40
+
+    def __init__(self, parent: QWidget) -> None:
+        super().__init__(parent)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self._t = 0.0
+        self._orb_params = [
+            {"fx": 0.00031, "fy": 0.00019, "px": 0.0, "py": 1.1},
+            {"fx": 0.00023, "fy": 0.00037, "px": 2.1, "py": 0.4},
+            {"fx": 0.00017, "fy": 0.00027, "px": 4.3, "py": 3.0},
+        ]
+        timer = QTimer(self)
+        timer.timeout.connect(self._tick)
+        timer.start(self.TICK_MS)
+        self._timer = timer
+
+    def showEvent(self, event) -> None:  # noqa: N802
+        super().showEvent(event)
+        self.update()
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self.update()
+
+    def _tick(self) -> None:
+        self._t += self.TICK_MS
+        self.update()
+
+    def _orb_centre(self, idx: int, width: float, height: float) -> tuple[float, float]:
+        orb = self._orb_params[idx]
+        t = self._t
+        cx = width * 0.5 + width * 0.30 * math.sin(orb["fx"] * t + orb["px"])
+        cy = height * 0.5 + height * 0.28 * math.cos(orb["fy"] * t + orb["py"])
+        return cx, cy
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        colors = _theme_for(self)
+        width = float(self.width())
+        height = float(self.height())
+
+        painter.fillRect(self.rect(), QColor(colors["df_bg"]))
+        painter.setPen(Qt.NoPen)
+
+        for idx, orb_def in enumerate(colors["df_orbs"]):
+            cx, cy = self._orb_centre(idx, width, height)
+            radius = min(width, height) * orb_def["r_frac"]
+            base = QColor(orb_def["color"])
+            grad = QRadialGradient(QPointF(cx, cy), radius)
+            inner = QColor(base)
+            inner.setAlphaF(orb_def["alpha"])
+            mid = QColor(base)
+            mid.setAlphaF(orb_def["alpha"] * 0.40)
+            edge = QColor(base)
+            edge.setAlphaF(0.0)
+            grad.setColorAt(0.0, inner)
+            grad.setColorAt(0.55, mid)
+            grad.setColorAt(1.0, edge)
+            painter.setBrush(QBrush(grad))
+            painter.drawEllipse(QPointF(cx, cy), radius, radius)
+
+        spacing = colors["df_line_spacing"]
+        line_color = QColor(colors["df_line"])
+        line_color.setAlphaF(colors["df_line_alpha"])
+        painter.setPen(QPen(line_color, 0.5))
+        painter.setBrush(Qt.NoBrush)
+        int_width = int(width)
+        int_height = int(height)
+
+        x = -int_height
+        while x < int_width + int_height:
+            painter.drawLine(QPointF(float(x), 0.0), QPointF(float(x + int_height), float(int_height)))
+            x += spacing
+
+        x = -int_height
+        while x < int_width + int_height:
+            painter.drawLine(QPointF(float(x + int_height), 0.0), QPointF(float(x), float(int_height)))
+            x += spacing
+
+
+class ContentFrame(QFrame):
+    def __init__(self) -> None:
+        super().__init__()
+        self.setObjectName("contentFrame")
+        self._bg: DepthFieldBackground | None = None
+
+    def attach_bg(self, bg: DepthFieldBackground) -> None:
+        self._bg = bg
+        bg.setGeometry(0, 0, self.width(), self.height())
+        bg.lower()
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        if self._bg is not None:
+            self._bg.setGeometry(0, 0, self.width(), self.height())
 
 
 class SidebarPillButton(QPushButton):
@@ -669,6 +787,7 @@ class MainWindow(QMainWindow):
         self.stop_event: threading.Event | None = None
         self.running = False
         self._resolved_theme_mode = "light"
+        self._df_bg: DepthFieldBackground | None = None
 
         self.page_stack: QStackedWidget | None = None
         self.nav_buttons: dict[str, QPushButton] = {}
@@ -724,12 +843,13 @@ class MainWindow(QMainWindow):
         self.controls["close"].clicked.connect(self.close)
         sidebar_layout.addWidget(self.controls["close"])
 
-        content = QFrame()
-        content.setObjectName("contentFrame")
+        content = ContentFrame()
         content_layout = QVBoxLayout()
         content_layout.setContentsMargins(12, 18, 18, 16)
         content_layout.setSpacing(0)
         content.setLayout(content_layout)
+        self._df_bg = DepthFieldBackground(content)
+        content.attach_bg(self._df_bg)
 
         self.page_stack = QStackedWidget()
         self.page_stack.setObjectName("pageStack")
@@ -760,17 +880,11 @@ class MainWindow(QMainWindow):
         self._resolved_theme_mode = self._resolve_theme_mode(theme_value)
         colors = DARK_THEME if self._resolved_theme_mode == "dark" else LIGHT_THEME
         content_background = (
-            "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #171821, stop:0.52 #12131b, stop:1 #0f1016)"
+            "transparent"
             if self._resolved_theme_mode == "dark"
             else colors["content_bg"]
         )
-        card_background = (
-            "qlineargradient(x1:0, y1:0, x2:1, y2:1, "
-            "stop:0 rgba(30, 32, 74, 236), "
-            "stop:1 rgba(24, 26, 56, 232))"
-            if self._resolved_theme_mode == "dark"
-            else colors["card_bg"]
-        )
+        card_background = colors["card_bg"]
         page_surface = "transparent" if self._resolved_theme_mode == "dark" else colors["page_bg"]
         self.setStyleSheet(
             f"""
@@ -790,6 +904,9 @@ class MainWindow(QMainWindow):
             QToolTip {{ background: {colors["tooltip_bg"]}; color: {colors["tooltip_text"]}; border: 1px solid {colors["tooltip_border"]}; padding: 5px 6px; }}
             """
         )
+        if self._df_bg is not None:
+            self._df_bg.setVisible(self._resolved_theme_mode == "dark")
+            self._df_bg.update()
         for widget in self.findChildren(QWidget):
             widget.update()
 
