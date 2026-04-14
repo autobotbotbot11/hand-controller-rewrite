@@ -5,8 +5,8 @@ from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
-from PyQt5.QtCore import QPointF, QRectF, QSize, Qt, pyqtSlot
-from PyQt5.QtGui import QBrush, QColor, QFont, QPainter, QPalette, QPen, QPixmap, QPolygonF
+from PyQt5.QtCore import QPointF, QRectF, QSize, Qt, QTimer, pyqtSignal, pyqtSlot
+from PyQt5.QtGui import QBrush, QColor, QFont, QLinearGradient, QPainter, QPalette, QPen, QPixmap, QPolygonF
 from PyQt5.QtWidgets import (
     QButtonGroup,
     QCheckBox,
@@ -75,12 +75,21 @@ LIGHT_THEME = {
     "combo_border": "#d8d8dd",
     "combo_text": "#73737a",
     "combo_arrow": "#5b5b62",
+    "combo_popup_bg": "#ffffff",
+    "combo_popup_border": "#d8d8dd",
+    "combo_popup_text": "#2c2c34",
+    "combo_popup_sel_bg": "#eef1ff",
+    "combo_popup_sel_text": "#111111",
     "slider_groove": "#d7d9e2",
     "slider_fill": "#9aa5ff",
     "slider_handle": "#d9d9dd",
     "slider_handle_border": "#ccced4",
+    "accent": "#7282ff",
+    "accent2": "#9aa5ff",
     "help_border": "#1b1b1b",
     "help_text": "#1b1b1b",
+    "help_bg": "#eef1ff",
+    "help_hover_bg": "#dde4ff",
     "tooltip_bg": "#ffffff",
     "tooltip_border": "#d8d8dd",
     "tooltip_text": "#111111",
@@ -119,12 +128,21 @@ DARK_THEME = {
     "combo_border": "#2f2f33",
     "combo_text": "#9d9da4",
     "combo_arrow": "#9d9da4",
+    "combo_popup_bg": "#1c1c22",
+    "combo_popup_border": "#2f2f33",
+    "combo_popup_text": "#d0d0e0",
+    "combo_popup_sel_bg": "#2a2a38",
+    "combo_popup_sel_text": "#f4f4f6",
     "slider_groove": "#2a2a2d",
     "slider_fill": "#4e59ff",
     "slider_handle": "#d9d9dd",
     "slider_handle_border": "#d0d0d4",
+    "accent": "#6272ff",
+    "accent2": "#a78bfa",
     "help_border": "#f4f4f6",
     "help_text": "#f4f4f6",
+    "help_bg": "#2a2a36",
+    "help_hover_bg": "#383848",
     "tooltip_bg": "#262626",
     "tooltip_border": "#3a3a3f",
     "tooltip_text": "#f4f4f6",
@@ -155,9 +173,21 @@ class SidebarPillButton(QPushButton):
         super().__init__(text)
         self.icon_kind = icon_kind
         self.launch = launch
+        self._glow = 0.0
         self.setCursor(Qt.PointingHandCursor)
         self.setFlat(True)
         self.setMinimumHeight(58 if launch else 40)
+        timer = QTimer(self)
+        timer.timeout.connect(self._tick)
+        timer.start(16)
+        self._timer = timer
+
+    def _tick(self) -> None:
+        target = 1.0 if self.underMouse() else 0.0
+        delta = target - self._glow
+        self._glow = target if abs(delta) < 0.04 else self._glow + delta * 0.14
+        if abs(delta) > 0.001:
+            self.update()
 
     def set_icon_kind(self, icon_kind: str) -> None:
         self.icon_kind = icon_kind
@@ -189,6 +219,12 @@ class SidebarPillButton(QPushButton):
         painter.setPen(Qt.NoPen)
         painter.setBrush(QBrush(fill))
         painter.drawRoundedRect(rect, radius, radius)
+
+        if self._glow > 0.01:
+            glow = QColor("#ffffff") if self.launch else QColor(colors["accent"])
+            glow.setAlphaF(self._glow * (0.08 if self.launch else 0.10))
+            painter.setBrush(QBrush(glow))
+            painter.drawRoundedRect(rect, radius, radius)
 
         icon_center_x = 26 if self.launch else 18
         icon_center_y = rect.center().y()
@@ -224,6 +260,20 @@ class ToggleSwitch(QCheckBox):
         super().__init__()
         self.setCursor(Qt.PointingHandCursor)
         self.setFixedSize(42, 22)
+        self._knob_x = 2.0
+        timer = QTimer(self)
+        timer.timeout.connect(self._tick)
+        timer.start(16)
+        self._timer = timer
+
+    def _tick(self) -> None:
+        track_height = self.height() - 2
+        knob_size = track_height - 4
+        target = (self.width() - 2 - knob_size - 2) if self.isChecked() else 2.0
+        delta = target - self._knob_x
+        self._knob_x = target if abs(delta) < 0.5 else self._knob_x + delta * 0.22
+        if abs(delta) > 0.001:
+            self.update()
 
     def sizeHint(self) -> QSize:  # noqa: N802
         return QSize(42, 22)
@@ -237,17 +287,40 @@ class ToggleSwitch(QCheckBox):
         colors = _theme_for(self)
 
         track_rect = QRectF(1, 1, self.width() - 2, self.height() - 2)
-        track_color = QColor("#19e85c" if self.isChecked() else colors["toggle_off_track"])
+        track_height = track_rect.height()
+        knob_size = track_height - 4
+        travel = track_rect.width() - knob_size - 4
+        progress = max(0.0, min(1.0, (self._knob_x - 2.0) / travel)) if travel > 0 else 0.0
+
+        if progress > 0.01:
+            gradient = QLinearGradient(track_rect.left(), 0, track_rect.right(), 0)
+            off_color = QColor(colors["toggle_off_track"])
+            on_color = QColor("#19e85c")
+
+            def blend(a: QColor, b: QColor, amount: float) -> QColor:
+                return QColor(
+                    int(a.red() * (1 - amount) + b.red() * amount),
+                    int(a.green() * (1 - amount) + b.green() * amount),
+                    int(a.blue() * (1 - amount) + b.blue() * amount),
+                )
+
+            start = blend(off_color, on_color, progress * 0.85)
+            end = blend(off_color, on_color, progress)
+            gradient.setColorAt(0, start)
+            gradient.setColorAt(1, end)
+            track_brush = QBrush(gradient)
+            border_color = end
+        else:
+            track_brush = QBrush(QColor(colors["toggle_off_track"]))
+            border_color = QColor(colors["toggle_off_border"])
+
         knob_color = QColor("#d9d9dc" if self.isChecked() else colors["toggle_off_knob"])
-        border_color = QColor("#19e85c" if self.isChecked() else colors["toggle_off_border"])
 
         painter.setPen(QPen(border_color, 1))
-        painter.setBrush(QBrush(track_color))
+        painter.setBrush(track_brush)
         painter.drawRoundedRect(track_rect, track_rect.height() / 2.0, track_rect.height() / 2.0)
 
-        knob_size = track_rect.height() - 4
-        knob_x = track_rect.right() - knob_size - 2 if self.isChecked() else track_rect.left() + 2
-        knob_rect = QRectF(knob_x, track_rect.top() + 2, knob_size, knob_size)
+        knob_rect = QRectF(self._knob_x, track_rect.top() + 2, knob_size, knob_size)
         painter.setPen(Qt.NoPen)
         painter.setBrush(QBrush(knob_color))
         painter.drawEllipse(knob_rect)
@@ -257,10 +330,23 @@ class NavButton(QPushButton):
     def __init__(self, text: str) -> None:
         super().__init__(text)
         self._active = False
+        self._hover_amount = 0.0
         self.setCursor(Qt.PointingHandCursor)
         self.setFlat(True)
         self.setCheckable(True)
         self.setFixedHeight(38)
+        timer = QTimer(self)
+        timer.timeout.connect(self._tick)
+        timer.start(16)
+        self._timer = timer
+
+    def _tick(self) -> None:
+        target = 1.0 if (self.underMouse() or self._active) else 0.0
+        step = 0.08
+        delta = target - self._hover_amount
+        self._hover_amount = target if abs(delta) < step else self._hover_amount + (step if delta > 0 else -step)
+        if abs(delta) > 0.001:
+            self.update()
 
     def set_active(self, active: bool) -> None:
         self._active = active
@@ -273,14 +359,20 @@ class NavButton(QPushButton):
         colors = _theme_for(self)
 
         rect = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
-        if self._active:
+        if self._hover_amount > 0.001:
             pill_rect = QRectF(rect.left() + 5, rect.top() + 1, rect.width() - 5, rect.height() - 2)
+            pill_color = QColor(colors["nav_active_bg"])
+            pill_color.setAlphaF(self._hover_amount * (1.0 if self._active else 0.55))
             painter.setPen(Qt.NoPen)
-            painter.setBrush(QBrush(QColor(colors["nav_active_bg"])))
+            painter.setBrush(QBrush(pill_color))
             painter.drawRoundedRect(pill_rect, 8, 8)
 
+        if self._active:
             indicator_rect = QRectF(pill_rect.left() + 2, rect.top() + 11, 2, rect.height() - 22)
-            painter.setBrush(QBrush(QColor(colors["nav_indicator"])))
+            indicator_gradient = QLinearGradient(0, indicator_rect.top(), 0, indicator_rect.bottom())
+            indicator_gradient.setColorAt(0, QColor(colors["accent"]))
+            indicator_gradient.setColorAt(1, QColor(colors["accent2"]))
+            painter.setBrush(QBrush(indicator_gradient))
             painter.drawRoundedRect(indicator_rect, 1.0, 1.0)
 
         painter.setPen(QColor(colors["nav_text_active"] if self._active else colors["nav_text_inactive"]))
@@ -290,6 +382,196 @@ class NavButton(QPushButton):
             Qt.AlignVCenter | Qt.AlignLeft,
             self.text(),
         )
+
+
+class HelpBadge(QWidget):
+    def __init__(self, tip: str) -> None:
+        super().__init__()
+        self._hovered = False
+        self.setFixedSize(18, 18)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setToolTip(tip)
+
+    def enterEvent(self, event) -> None:  # noqa: N802
+        self._hovered = True
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:  # noqa: N802
+        self._hovered = False
+        self.update()
+        super().leaveEvent(event)
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        colors = _theme_for(self)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QBrush(QColor(colors["help_hover_bg"] if self._hovered else colors["help_bg"])))
+        painter.drawEllipse(QRectF(1, 1, 16, 16))
+        painter.setPen(QColor(colors["accent"] if self._hovered else colors["help_text"]))
+        painter.setFont(QFont("Segoe UI", 8, QFont.Bold))
+        painter.drawText(QRectF(0, 0, 18, 18), Qt.AlignCenter, "?")
+
+
+class ThemedComboBox(QComboBox):
+    def paintEvent(self, event) -> None:  # noqa: N802
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        colors = _theme_for(self)
+
+        rect = QRectF(0.5, 0.5, self.width() - 1, self.height() - 1)
+        painter.setPen(QPen(QColor(colors["combo_border"]), 1))
+        painter.setBrush(QBrush(QColor(colors["combo_bg"])))
+        painter.drawRoundedRect(rect, 6, 6)
+
+        painter.setPen(QColor(colors["combo_text"]))
+        painter.setFont(QFont("Segoe UI", 10))
+        painter.drawText(QRectF(9, 0, self.width() - 30, self.height()), Qt.AlignVCenter | Qt.AlignLeft, self.currentText())
+
+        arrow_pen = QPen(QColor(colors["combo_arrow"]), 1.7, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+        painter.setPen(arrow_pen)
+        painter.setBrush(Qt.NoBrush)
+        ax = self.width() - 17
+        ay = self.height() / 2 - 3
+        painter.drawPolyline(QPolygonF([QPointF(ax, ay), QPointF(ax + 5, ay + 5), QPointF(ax + 10, ay)]))
+
+    def showPopup(self) -> None:  # noqa: N802
+        colors = _theme_for(self)
+        self.setStyleSheet(
+            f"""
+            QComboBox QAbstractItemView {{
+                background-color: {colors["combo_popup_bg"]};
+                border: 1px solid {colors["combo_popup_border"]};
+                border-radius: 6px;
+                color: {colors["combo_popup_text"]};
+                selection-background-color: {colors["combo_popup_sel_bg"]};
+                selection-color: {colors["combo_popup_sel_text"]};
+                padding: 2px;
+                outline: none;
+                font-family: "Segoe UI";
+                font-size: 10px;
+            }}
+            QComboBox QAbstractItemView::item {{
+                min-height: 26px;
+                padding-left: 8px;
+                border-radius: 4px;
+            }}
+            QComboBox QAbstractItemView::item:hover {{
+                background-color: {colors["combo_popup_sel_bg"]};
+                color: {colors["combo_popup_sel_text"]};
+            }}
+            QScrollBar:vertical {{
+                background: {colors["combo_popup_bg"]};
+                width: 6px;
+                border-radius: 3px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {colors["combo_popup_border"]};
+                border-radius: 3px;
+                min-height: 20px;
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                height: 0;
+            }}
+            """
+        )
+        super().showPopup()
+
+    def hidePopup(self) -> None:  # noqa: N802
+        super().hidePopup()
+        self.setStyleSheet("")
+
+
+class ThinSlider(QWidget):
+    valueChanged = pyqtSignal(int)
+
+    def __init__(self, lo: int, hi: int, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._lo = lo
+        self._hi = hi
+        self._val = lo
+        self._hovered = False
+        self._dragging = False
+        self.setFixedHeight(22)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+    def value(self) -> int:
+        return self._val
+
+    def setValue(self, value: int) -> None:  # noqa: N802
+        clamped = max(self._lo, min(self._hi, int(value)))
+        if clamped == self._val:
+            return
+        self._val = clamped
+        self.update()
+        if not self.signalsBlocked():
+            self.valueChanged.emit(clamped)
+
+    def _groove_rect(self) -> QRectF:
+        h = self.height()
+        return QRectF(8, h / 2 - 2.5, self.width() - 16, 5)
+
+    def _handle_x(self) -> float:
+        groove = self._groove_rect()
+        fraction = (self._val - self._lo) / max(1, self._hi - self._lo)
+        return groove.left() + fraction * groove.width()
+
+    def _set_from_x(self, x: float) -> None:
+        groove = self._groove_rect()
+        fraction = max(0.0, min(1.0, (x - groove.left()) / groove.width()))
+        self.setValue(round(self._lo + fraction * (self._hi - self._lo)))
+
+    def enterEvent(self, event) -> None:  # noqa: N802
+        self._hovered = True
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:  # noqa: N802
+        self._hovered = False
+        self.update()
+        super().leaveEvent(event)
+
+    def mousePressEvent(self, event) -> None:  # noqa: N802
+        if event.button() == Qt.LeftButton:
+            self._dragging = True
+            self._set_from_x(event.x())
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:  # noqa: N802
+        if self._dragging:
+            self._set_from_x(event.x())
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event) -> None:  # noqa: N802
+        if event.button() == Qt.LeftButton:
+            self._dragging = False
+        super().mouseReleaseEvent(event)
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        colors = _theme_for(self)
+        groove = self._groove_rect()
+        cx = self._handle_x()
+        h = self.height()
+
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QBrush(QColor(colors["slider_groove"])))
+        painter.drawRoundedRect(groove, 2, 2)
+
+        if cx > groove.left() + 1:
+            fill = QRectF(groove.left(), groove.top(), cx - groove.left(), groove.height())
+            gradient = QLinearGradient(fill.left(), 0, fill.right(), 0)
+            gradient.setColorAt(0, QColor(colors["accent"]))
+            gradient.setColorAt(1, QColor(colors["accent2"]))
+            painter.setBrush(QBrush(gradient))
+            painter.drawRoundedRect(fill, 2, 2)
+
+        radius = 8.0 if (self._hovered or self._dragging) else 6.0
+        painter.setBrush(QBrush(QColor(colors["accent2"] if (self._hovered or self._dragging) else colors["accent"])))
+        painter.drawEllipse(QPointF(cx, h / 2), radius, radius)
 
 
 class MainWindow(QMainWindow):
@@ -425,22 +707,6 @@ class MainWindow(QMainWindow):
             QFrame#card {{ border: 1px solid {colors["card_border"]}; border-radius: 24px; background: {colors["card_bg"]}; }}
             QPushButton#outlineButton {{ background: {colors["outline_bg"]}; border: 1px solid {colors["outline_border"]}; border-radius: 2px; min-height: 22px; padding: 1px 8px; font-size: 10px; color: {colors["outline_text"]}; }}
             QPushButton#dangerButton {{ background: {colors["outline_bg"]}; border: 1px solid {colors["danger_border"]}; border-radius: 5px; min-height: 22px; padding: 1px 8px; font-size: 10px; font-weight: 700; color: {colors["danger_text"]}; }}
-            QComboBox {{ background: {colors["combo_bg"]}; border: 1px solid {colors["combo_border"]}; border-radius: 2px; min-height: 22px; padding: 1px 8px; font-size: 10px; color: {colors["combo_text"]}; }}
-            QComboBox::drop-down {{ border: none; width: 18px; }}
-            QComboBox::down-arrow {{
-                image: none;
-                width: 0px;
-                height: 0px;
-                border-left: 4px solid transparent;
-                border-right: 4px solid transparent;
-                border-top: 5px solid {colors["combo_arrow"]};
-                margin-right: 6px;
-            }}
-            QComboBox QAbstractItemView {{ background: {colors["combo_bg"]}; color: {colors["combo_text"]}; border: 1px solid {colors["combo_border"]}; selection-background-color: {colors["nav_active_bg"]}; selection-color: {colors["text_primary"]}; }}
-            QSlider::groove:horizontal {{ height: 4px; background: {colors["slider_groove"]}; border-radius: 2px; }}
-            QSlider::sub-page:horizontal {{ background: {colors["slider_fill"]}; border-radius: 2px; }}
-            QSlider::handle:horizontal {{ background: {colors["slider_handle"]}; width: 14px; margin: -6px 0; border-radius: 7px; border: 1px solid {colors["slider_handle_border"]}; }}
-            QToolButton {{ border: 1px solid {colors["help_border"]}; border-radius: 7px; min-width: 14px; max-width: 14px; min-height: 14px; max-height: 14px; padding: 0; font-size: 9px; font-weight: 700; color: {colors["help_text"]}; background: transparent; }}
             QToolTip {{ background: {colors["tooltip_bg"]}; color: {colors["tooltip_text"]}; border: 1px solid {colors["tooltip_border"]}; padding: 5px 6px; }}
             """
         )
@@ -541,10 +807,7 @@ class MainWindow(QMainWindow):
         return label
 
     def _help(self, key: str) -> QToolButton:
-        button = QToolButton()
-        button.setText("?")
-        button.setToolTip(HELP_TEXT[key])
-        return button
+        return HelpBadge(HELP_TEXT[key])
 
     def _switch(self, key: str) -> QCheckBox:
         box = ToggleSwitch()
@@ -552,14 +815,13 @@ class MainWindow(QMainWindow):
         return box
 
     def _combo(self, key: str, width: int = 150) -> QComboBox:
-        combo = QComboBox()
+        combo = ThemedComboBox()
         combo.setFixedWidth(width)
         self.controls[key] = combo
         return combo
 
     def _slider(self, key: str, minimum: int, maximum: int) -> QSlider:
-        slider = QSlider(Qt.Horizontal)
-        slider.setRange(minimum, maximum)
+        slider = ThinSlider(minimum, maximum)
         self.controls[key] = slider
         return slider
 
