@@ -137,11 +137,17 @@ def _label_camera_sources(indices: list[int], *, device_names: list[str]) -> lis
     return labeled
 
 
-def detect_available_cameras(*, max_index: int = 5, width: int = 640, height: int = 480) -> list[CameraSource]:
+def detect_available_cameras(
+    *,
+    max_index: int = 5,
+    width: int = 640,
+    height: int = 480,
+    include_placeholder: bool = True,
+) -> list[CameraSource]:
     try:
         import cv2
     except ModuleNotFoundError:
-        return [CameraSource(label="Default Webcam (Index 0)", index=0)]
+        return [CameraSource(label="Default Webcam (Index 0)", index=0)] if include_placeholder else []
 
     detected_indices: list[int] = []
     with _quiet_cv_logging(cv2):
@@ -157,7 +163,7 @@ def detect_available_cameras(*, max_index: int = 5, width: int = 640, height: in
                 except Exception:
                     pass
     if not detected_indices:
-        return [CameraSource(label="Default Webcam (Index 0)", index=0)]
+        return [CameraSource(label="Default Webcam (Index 0)", index=0)] if include_placeholder else []
     return _label_camera_sources(detected_indices, device_names=_windows_camera_names())
 
 

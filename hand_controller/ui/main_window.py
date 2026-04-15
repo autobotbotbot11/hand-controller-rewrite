@@ -1440,6 +1440,28 @@ class MainWindow(QMainWindow):
             height=self.working_config.camera.height,
         )
 
+    def _apply_camera_source_list(self, sources: list[CameraSource], *, preferred_index: int | None = None) -> None:
+        combo = self.controls.get("camera_source")
+        if not isinstance(combo, QComboBox):
+            return
+
+        self.camera_sources = sources
+        target_index = self.working_config.camera.index if preferred_index is None else preferred_index
+        combo.blockSignals(True)
+        combo.clear()
+        for camera_source in self.camera_sources:
+            combo.addItem(camera_source.label, camera_source.index)
+        combo.blockSignals(False)
+
+        idx = combo.findData(target_index)
+        if idx < 0:
+            idx = 0
+        combo.setCurrentIndex(max(0, idx))
+        current_value = combo.itemData(combo.currentIndex())
+        if current_value is not None:
+            self._update_camera(index=int(current_value))
+        self._update_camera_source_feedback()
+
     def _refresh_camera_sources(self) -> None:
         if self._camera_refresh_thread is not None and self._camera_refresh_thread.isRunning():
             return
@@ -1473,27 +1495,10 @@ class MainWindow(QMainWindow):
             self._camera_refresh_failed("Camera refresh returned an invalid result.")
             return
 
-        combo = self.controls.get("camera_source")
-        if not isinstance(combo, QComboBox):
-            self._set_camera_refresh_state(False)
-            return
-
         selected_index = self.working_config.camera.index
-        self.camera_sources = [source for source in sources if isinstance(source, CameraSource)]
-        combo.blockSignals(True)
-        combo.clear()
-        for camera_source in self.camera_sources:
-            combo.addItem(camera_source.label, camera_source.index)
-        combo.blockSignals(False)
-        idx = combo.findData(selected_index)
-        if idx < 0:
-            idx = 0
-        combo.setCurrentIndex(max(0, idx))
-        current_value = combo.itemData(combo.currentIndex())
-        if current_value is not None:
-            self._update_camera(index=int(current_value))
+        camera_sources = [source for source in sources if isinstance(source, CameraSource)]
+        self._apply_camera_source_list(camera_sources, preferred_index=selected_index)
         self._set_camera_refresh_state(False)
-        self._update_camera_source_feedback()
 
     @pyqtSlot(str)
     def _camera_refresh_failed(self, error_text: str) -> None:
@@ -1683,6 +1688,34 @@ class MainWindow(QMainWindow):
         if not launch_config.camera.enabled:
             QMessageBox.warning(self, "Camera Disabled", "Enable Camera first before launching the app.")
             return
+        available_sources = detect_available_cameras(
+            max_index=5,
+            width=launch_config.camera.width,
+            height=launch_config.camera.height,
+            include_placeholder=False,
+        )
+        if not available_sources:
+            QMessageBox.warning(
+                self,
+                "No Camera Detected",
+                "No usable camera source was detected. Connect or enable a camera first, then try again.",
+            )
+            self._apply_camera_source_list(self._detect_camera_sources(), preferred_index=launch_config.camera.index)
+            return
+        selected_index = launch_config.camera.index
+        available_indices = {source.index for source in available_sources}
+        if selected_index not in available_indices:
+            fallback = next((source for source in available_sources if source.index == 0), available_sources[0])
+            self._apply_camera_source_list(available_sources, preferred_index=fallback.index)
+            QMessageBox.information(
+                self,
+                "Camera Fallback",
+                f"The previously selected camera is no longer available. The app will use {fallback.label} instead.",
+            )
+            launch_config = self.working_config
+        else:
+            self._apply_camera_source_list(available_sources, preferred_index=selected_index)
+            launch_config = self.working_config
         self.overlay = OverlayWindow(launch_config.keyboard)
         self.overlay_bus = OverlaySignalBus()
         self.overlay_bus.update_overlay.connect(self.overlay.apply_payload)
