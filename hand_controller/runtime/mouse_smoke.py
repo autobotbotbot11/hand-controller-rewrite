@@ -209,7 +209,7 @@ def _draw_control_smoke(
             cv2.LINE_AA,
         )
 
-    if runtime_state.mode == Mode.KEYBOARD:
+    if runtime_state.control_enabled and runtime_state.mode == Mode.KEYBOARD:
         _draw_keyboard_overlay(
             frame_bgr,
             keyboard_update=keyboard_update,

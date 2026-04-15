@@ -1451,13 +1451,12 @@ class MainWindow(QMainWindow):
         combo.clear()
         for camera_source in self.camera_sources:
             combo.addItem(camera_source.label, camera_source.index)
-        combo.blockSignals(False)
-
         idx = combo.findData(target_index)
         if idx < 0:
             idx = 0
         combo.setCurrentIndex(max(0, idx))
         current_value = combo.itemData(combo.currentIndex())
+        combo.blockSignals(False)
         if current_value is not None:
             self._update_camera(index=int(current_value))
         self._update_camera_source_feedback()
@@ -1488,6 +1487,16 @@ class MainWindow(QMainWindow):
         combo.setEnabled(not refreshing)
         if refreshing and self.camera_info_label is not None:
             self.camera_info_label.setText("Scanning camera sources...")
+
+    def _set_camera_source_controls_enabled(self, enabled: bool, *, info_text: str | None = None) -> None:
+        refresh_button = self.controls.get("camera_refresh")
+        combo = self.controls.get("camera_source")
+        if isinstance(refresh_button, QPushButton):
+            refresh_button.setEnabled(enabled)
+        if isinstance(combo, QComboBox):
+            combo.setEnabled(enabled)
+        if info_text is not None and self.camera_info_label is not None:
+            self.camera_info_label.setText(info_text)
 
     @pyqtSlot(object)
     def _camera_refresh_finished(self, sources: object) -> None:
@@ -1537,6 +1546,60 @@ class MainWindow(QMainWindow):
                 "so the labels stay generic."
             )
         self.camera_info_label.setText(text)
+
+    def _selected_camera_source(self) -> CameraSource | None:
+        current_index = self.working_config.camera.index
+        return next((source for source in self.camera_sources if source.index == current_index), None)
+
+    def _launch_camera_preflight(
+        self,
+        *,
+        preferred_index: int,
+        show_dialogs: bool,
+        keep_previous_index: int | None = None,
+    ) -> AppConfig | None:
+        launch_config = self.working_config
+        available_sources = detect_available_cameras(
+            max_index=5,
+            width=launch_config.camera.width,
+            height=launch_config.camera.height,
+            include_placeholder=False,
+        )
+        if not available_sources:
+            if show_dialogs:
+                QMessageBox.warning(
+                    self,
+                    "No Camera Detected",
+                    "No usable camera source was detected. Connect or enable a camera first, then try again.",
+                )
+            elif self.camera_info_label is not None:
+                self.camera_info_label.setText("No usable camera source was detected. Keeping the current camera.")
+            self._apply_camera_source_list(self._detect_camera_sources(), preferred_index=keep_previous_index or preferred_index)
+            return None
+
+        available_indices = {source.index for source in available_sources}
+        if preferred_index not in available_indices:
+            fallback = next((source for source in available_sources if source.index == 0), available_sources[0])
+            self._apply_camera_source_list(available_sources, preferred_index=fallback.index)
+            if show_dialogs:
+                QMessageBox.information(
+                    self,
+                    "Camera Fallback",
+                    f"The previously selected camera is no longer available. The app will use {fallback.label} instead.",
+                )
+            elif self.camera_info_label is not None:
+                if keep_previous_index is not None and fallback.index == keep_previous_index:
+                    self.camera_info_label.setText(
+                        f"The selected camera is no longer available. Keeping {fallback.label}."
+                    )
+                else:
+                    self.camera_info_label.setText(
+                        f"The selected camera is no longer available. Switching to {fallback.label}."
+                    )
+            return self.working_config
+
+        self._apply_camera_source_list(available_sources, preferred_index=preferred_index)
+        return self.working_config
 
     def _block(self, key: str, block: bool) -> None:
         widget = self.controls.get(key)
@@ -1618,10 +1681,37 @@ class MainWindow(QMainWindow):
             pass
 
     def _camera_source_changed(self, index: int) -> None:
+        previous_index = self.working_config.camera.index
         value = self.controls["camera_source"].itemData(index)
         if value is not None:
             self._update_camera(index=int(value))
         self._update_camera_source_feedback()
+        if self.running and value is not None and int(value) != previous_index:
+            self._switch_running_camera(previous_index=previous_index, requested_index=int(value))
+
+    def _switch_running_camera(self, *, previous_index: int, requested_index: int) -> None:
+        if not self.running:
+            return
+        self._set_camera_source_controls_enabled(False, info_text="Switching camera...")
+        prepared_config = self._launch_camera_preflight(
+            preferred_index=requested_index,
+            show_dialogs=False,
+            keep_previous_index=previous_index,
+        )
+        target_index = self.working_config.camera.index
+        if prepared_config is None or target_index == previous_index:
+            self._set_camera_source_controls_enabled(True)
+            self._update_camera_source_feedback()
+            return
+
+        self.stop_worker()
+        self._launch_worker(prepared_config, minimize_on_start=False)
+        source = self._selected_camera_source()
+        if self.camera_info_label is not None:
+            self.camera_info_label.setText(
+                f"Switched to {(source.label if source is not None else f'camera index {target_index}')} while running."
+            )
+        self._set_camera_source_controls_enabled(True)
 
     def _theme_changed(self, value: str) -> None:
         self._update_general(theme=value)
@@ -1681,41 +1771,7 @@ class MainWindow(QMainWindow):
         else:
             self.start_worker()
 
-    def start_worker(self) -> None:
-        if self.running:
-            return
-        launch_config = self.working_config
-        if not launch_config.camera.enabled:
-            QMessageBox.warning(self, "Camera Disabled", "Enable Camera first before launching the app.")
-            return
-        available_sources = detect_available_cameras(
-            max_index=5,
-            width=launch_config.camera.width,
-            height=launch_config.camera.height,
-            include_placeholder=False,
-        )
-        if not available_sources:
-            QMessageBox.warning(
-                self,
-                "No Camera Detected",
-                "No usable camera source was detected. Connect or enable a camera first, then try again.",
-            )
-            self._apply_camera_source_list(self._detect_camera_sources(), preferred_index=launch_config.camera.index)
-            return
-        selected_index = launch_config.camera.index
-        available_indices = {source.index for source in available_sources}
-        if selected_index not in available_indices:
-            fallback = next((source for source in available_sources if source.index == 0), available_sources[0])
-            self._apply_camera_source_list(available_sources, preferred_index=fallback.index)
-            QMessageBox.information(
-                self,
-                "Camera Fallback",
-                f"The previously selected camera is no longer available. The app will use {fallback.label} instead.",
-            )
-            launch_config = self.working_config
-        else:
-            self._apply_camera_source_list(available_sources, preferred_index=selected_index)
-            launch_config = self.working_config
+    def _launch_worker(self, launch_config: AppConfig, *, minimize_on_start: bool) -> None:
         self.overlay = OverlayWindow(launch_config.keyboard)
         self.overlay_bus = OverlaySignalBus()
         self.overlay_bus.update_overlay.connect(self.overlay.apply_payload)
@@ -1729,8 +1785,23 @@ class MainWindow(QMainWindow):
         self.worker_thread.start()
         self.running = True
         self._update_launch_button()
-        if launch_config.general.minimize_after_launch:
+        if minimize_on_start:
             self.showMinimized()
+
+    def start_worker(self) -> None:
+        if self.running:
+            return
+        launch_config = self.working_config
+        if not launch_config.camera.enabled:
+            QMessageBox.warning(self, "Camera Disabled", "Enable Camera first before launching the app.")
+            return
+        prepared_config = self._launch_camera_preflight(
+            preferred_index=launch_config.camera.index,
+            show_dialogs=True,
+        )
+        if prepared_config is None:
+            return
+        self._launch_worker(prepared_config, minimize_on_start=prepared_config.general.minimize_after_launch)
 
     def stop_worker(self) -> None:
         if not self.running:

@@ -127,7 +127,7 @@ def _build_overlay_payload(
     gesture_command_text: str,
     debug_tags: tuple[str, ...],
 ) -> OverlayPayload:
-    keyboard_visible = runtime_state.mode == Mode.KEYBOARD
+    keyboard_visible = runtime_state.control_enabled and runtime_state.mode == Mode.KEYBOARD
     return OverlayPayload(
         mode=runtime_state.mode.value,
         control_enabled=runtime_state.control_enabled,
