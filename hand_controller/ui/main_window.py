@@ -31,6 +31,7 @@ from PyQt5.QtWidgets import (
 )
 
 from ..config.settings import AppConfig, build_factory_default_config
+from ..vision.camera import detect_available_cameras
 from .overlay_window import OverlayWindow
 from .signals import OverlaySignalBus
 
@@ -1389,27 +1390,11 @@ class MainWindow(QMainWindow):
         button.update()
 
     def _detect_camera_sources(self) -> list[tuple[str, int]]:
-        try:
-            import cv2
-        except ModuleNotFoundError:
-            return [("Default Webcam", 0)]
-        sources: list[tuple[str, int]] = []
-        api_pref = getattr(cv2, "CAP_DSHOW", 0)
-        for index in range(5):
-            cap = None
-            try:
-                cap = cv2.VideoCapture(index, api_pref)
-                if cap.isOpened():
-                    sources.append(("Default Webcam" if index == 0 else f"Camera {index}", index))
-            except Exception:
-                pass
-            finally:
-                try:
-                    if cap is not None:
-                        cap.release()
-                except Exception:
-                    pass
-        return sources or [("Default Webcam", 0)]
+        return detect_available_cameras(
+            max_index=5,
+            width=self.working_config.camera.width,
+            height=self.working_config.camera.height,
+        )
 
     def _block(self, key: str, block: bool) -> None:
         widget = self.controls.get(key)
