@@ -7,7 +7,7 @@ from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
-from PyQt5.QtCore import QPointF, QRectF, QSize, Qt, QTimer, pyqtSignal, pyqtSlot
+from PyQt5.QtCore import QPointF, QRectF, QSize, Qt, QThread, QTimer, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QBrush, QColor, QFont, QLinearGradient, QPainter, QPalette, QPen, QPixmap, QPolygonF, QRadialGradient
 from PyQt5.QtWidgets import (
     QButtonGroup,
@@ -942,6 +942,29 @@ class ThinSlider(QWidget):
         painter.drawEllipse(QPointF(cx, h / 2), radius, radius)
 
 
+class CameraRefreshThread(QThread):
+    refreshed = pyqtSignal(object)
+    failed = pyqtSignal(str)
+
+    def __init__(self, *, width: int, height: int, max_index: int = 5) -> None:
+        super().__init__()
+        self._width = width
+        self._height = height
+        self._max_index = max_index
+
+    def run(self) -> None:  # noqa: D401
+        try:
+            sources = detect_available_cameras(
+                max_index=self._max_index,
+                width=self._width,
+                height=self._height,
+            )
+        except Exception as exc:
+            self.failed.emit(str(exc))
+            return
+        self.refreshed.emit(sources)
+
+
 class MainWindow(QMainWindow):
     def __init__(
         self,
@@ -975,6 +998,7 @@ class MainWindow(QMainWindow):
         self.controls: dict[str, QWidget] = {}
         self.value_labels: dict[str, QLabel] = {}
         self.camera_info_label: QLabel | None = None
+        self._camera_refresh_thread: CameraRefreshThread | None = None
         self.camera_sources = self._detect_camera_sources()
         self._status_dot: StatusDot | None = None
 
@@ -1417,11 +1441,45 @@ class MainWindow(QMainWindow):
         )
 
     def _refresh_camera_sources(self) -> None:
+        if self._camera_refresh_thread is not None and self._camera_refresh_thread.isRunning():
+            return
+
+        self._set_camera_refresh_state(True)
+        thread = CameraRefreshThread(
+            width=self.working_config.camera.width,
+            height=self.working_config.camera.height,
+            max_index=5,
+        )
+        thread.refreshed.connect(self._camera_refresh_finished)
+        thread.failed.connect(self._camera_refresh_failed)
+        thread.finished.connect(self._camera_refresh_cleanup)
+        self._camera_refresh_thread = thread
+        thread.start()
+
+    def _set_camera_refresh_state(self, refreshing: bool) -> None:
+        refresh_button = self.controls.get("camera_refresh")
         combo = self.controls.get("camera_source")
+        if isinstance(refresh_button, QPushButton):
+            refresh_button.setEnabled(not refreshing)
         if not isinstance(combo, QComboBox):
             return
+        combo.setEnabled(not refreshing)
+        if refreshing and self.camera_info_label is not None:
+            self.camera_info_label.setText("Scanning camera sources...")
+
+    @pyqtSlot(object)
+    def _camera_refresh_finished(self, sources: object) -> None:
+        if not isinstance(sources, list):
+            self._camera_refresh_failed("Camera refresh returned an invalid result.")
+            return
+
+        combo = self.controls.get("camera_source")
+        if not isinstance(combo, QComboBox):
+            self._set_camera_refresh_state(False)
+            return
+
         selected_index = self.working_config.camera.index
-        self.camera_sources = self._detect_camera_sources()
+        self.camera_sources = [source for source in sources if isinstance(source, CameraSource)]
         combo.blockSignals(True)
         combo.clear()
         for camera_source in self.camera_sources:
@@ -1434,7 +1492,23 @@ class MainWindow(QMainWindow):
         current_value = combo.itemData(combo.currentIndex())
         if current_value is not None:
             self._update_camera(index=int(current_value))
+        self._set_camera_refresh_state(False)
         self._update_camera_source_feedback()
+
+    @pyqtSlot(str)
+    def _camera_refresh_failed(self, error_text: str) -> None:
+        self._set_camera_refresh_state(False)
+        if self.camera_info_label is not None:
+            self.camera_info_label.setText(
+                f"Camera scan failed. Using the last known source list. Details: {error_text}"
+            )
+
+    @pyqtSlot()
+    def _camera_refresh_cleanup(self) -> None:
+        thread = self._camera_refresh_thread
+        self._camera_refresh_thread = None
+        if thread is not None:
+            thread.deleteLater()
 
     def _update_camera_source_feedback(self) -> None:
         if self.camera_info_label is None:
@@ -1651,5 +1725,7 @@ class MainWindow(QMainWindow):
         self._update_launch_button()
 
     def closeEvent(self, event) -> None:  # noqa: N802
+        if self._camera_refresh_thread is not None and self._camera_refresh_thread.isRunning():
+            self._camera_refresh_thread.wait(1500)
         self.stop_worker()
         event.accept()
