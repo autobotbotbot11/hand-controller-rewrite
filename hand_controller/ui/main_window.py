@@ -31,7 +31,7 @@ from PyQt5.QtWidgets import (
 )
 
 from ..config.settings import AppConfig, build_factory_default_config
-from ..vision.camera import detect_available_cameras
+from ..vision.camera import CameraSource, detect_available_cameras
 from .overlay_window import OverlayWindow
 from .signals import OverlaySignalBus
 
@@ -52,7 +52,7 @@ HELP_TEXT = {
     "tap_cooldown": "Minimum delay before another keyboard tap is accepted.",
     "keyboard_enable": "Turns the virtual keyboard feature on or off.",
     "camera_enable": "Turns camera input on or off.",
-    "camera_source": "Selects which available camera device the app should use.",
+    "camera_source": "Selects which detected camera index the app should use. Hardware names are shown when Windows exposes them reliably.",
     "show_hand_skeleton": "Shows or hides hand skeleton lines on the overlay.",
     "hand_skeleton_thickness": "Adjusts skeleton line thickness.",
     "show_live_selfie": "Shows or hides the live selfie preview on the overlay.",
@@ -974,6 +974,7 @@ class MainWindow(QMainWindow):
         self.nav_buttons: dict[str, QPushButton] = {}
         self.controls: dict[str, QWidget] = {}
         self.value_labels: dict[str, QLabel] = {}
+        self.camera_info_label: QLabel | None = None
         self.camera_sources = self._detect_camera_sources()
         self._status_dot: StatusDot | None = None
 
@@ -1091,6 +1092,7 @@ class MainWindow(QMainWindow):
             QLabel#pageSubtitle {{ font-size: 12px; color: {colors["text_secondary"]}; background: transparent; margin-bottom: 10px; }}
             QLabel#fieldLabel {{ font-size: 13px; font-weight: 700; color: {colors["text_primary"]}; background: transparent; }}
             QLabel#valueLabel {{ font-size: 11px; color: {colors["value_text"]}; background: transparent; }}
+            QLabel#noteLabel {{ font-size: 11px; color: {colors["text_secondary"]}; background: transparent; padding-top: 2px; }}
             QScrollArea, QScrollArea > QWidget, QScrollArea > QWidget > QWidget {{ border: none; background: {page_surface}; }}
             QFrame#card {{ border: 1px solid {colors["card_border"]}; border-radius: 24px; background: {card_background}; }}
             QToolTip {{ background: {colors["tooltip_bg"]}; color: {colors["tooltip_text"]}; border: 1px solid {colors["tooltip_border"]}; padding: 5px 6px; }}
@@ -1198,6 +1200,12 @@ class MainWindow(QMainWindow):
         label.setObjectName("valueLabel")
         return label
 
+    def _note(self, text: str = "") -> QLabel:
+        label = QLabel(text)
+        label.setWordWrap(True)
+        label.setObjectName("noteLabel")
+        return label
+
     def _help(self, key: str) -> QToolButton:
         return HelpBadge(HELP_TEXT[key])
 
@@ -1279,11 +1287,23 @@ class MainWindow(QMainWindow):
         camera_enable.toggled.connect(lambda checked: self._update_camera(enabled=checked))
         self._row(layout, "Enable Camera", camera_enable, help_key="camera_enable")
 
-        source = self._combo("camera_source", width=138)
-        for label, index in self.camera_sources:
-            source.addItem(label, index)
+        source = self._combo("camera_source", width=258)
+        refresh = self._outline("camera_refresh", "Refresh", width=72)
+        refresh.clicked.connect(self._refresh_camera_sources)
+        source_row = QWidget()
+        source_row_layout = QHBoxLayout()
+        source_row_layout.setContentsMargins(0, 0, 0, 0)
+        source_row_layout.setSpacing(8)
+        source_row.setLayout(source_row_layout)
+        source_row_layout.addWidget(source, 1)
+        source_row_layout.addWidget(refresh, 0)
+        for camera_source in self.camera_sources:
+            source.addItem(camera_source.label, camera_source.index)
         source.currentIndexChanged.connect(self._camera_source_changed)
-        self._row(layout, "Camera Source", source, help_key="camera_source")
+        self._row(layout, "Camera Source", source_row, help_key="camera_source")
+        self.camera_info_label = self._note()
+        layout.addWidget(self.camera_info_label)
+        self._update_camera_source_feedback()
         return self._make_page("Camera", "Input device configuration", card)
 
     def _page_display(self) -> QWidget:
@@ -1389,12 +1409,55 @@ class MainWindow(QMainWindow):
         button.style().polish(button)
         button.update()
 
-    def _detect_camera_sources(self) -> list[tuple[str, int]]:
+    def _detect_camera_sources(self) -> list[CameraSource]:
         return detect_available_cameras(
             max_index=5,
             width=self.working_config.camera.width,
             height=self.working_config.camera.height,
         )
+
+    def _refresh_camera_sources(self) -> None:
+        combo = self.controls.get("camera_source")
+        if not isinstance(combo, QComboBox):
+            return
+        selected_index = self.working_config.camera.index
+        self.camera_sources = self._detect_camera_sources()
+        combo.blockSignals(True)
+        combo.clear()
+        for camera_source in self.camera_sources:
+            combo.addItem(camera_source.label, camera_source.index)
+        combo.blockSignals(False)
+        idx = combo.findData(selected_index)
+        if idx < 0:
+            idx = 0
+        combo.setCurrentIndex(max(0, idx))
+        current_value = combo.itemData(combo.currentIndex())
+        if current_value is not None:
+            self._update_camera(index=int(current_value))
+        self._update_camera_source_feedback()
+
+    def _update_camera_source_feedback(self) -> None:
+        if self.camera_info_label is None:
+            return
+        count = len(self.camera_sources)
+        uses_device_names = any(source.device_name for source in self.camera_sources)
+        if count <= 1:
+            if uses_device_names:
+                camera_name = next((source.device_name for source in self.camera_sources if source.device_name), "default camera")
+                text = f"Detected 1 camera source. Using {camera_name}. Click Refresh after connecting another webcam."
+            else:
+                text = "Detected 1 camera source. Click Refresh after connecting another webcam."
+        elif uses_device_names:
+            text = (
+                f"Detected {count} camera sources. Labels use best-effort Windows device names, "
+                "with the camera index shown for consistency."
+            )
+        else:
+            text = (
+                f"Detected {count} camera sources. This setup exposes camera indices more reliably than hardware names, "
+                "so the labels stay generic."
+            )
+        self.camera_info_label.setText(text)
 
     def _block(self, key: str, block: bool) -> None:
         widget = self.controls.get(key)
@@ -1419,7 +1482,8 @@ class MainWindow(QMainWindow):
             self.controls["camera_enable"].setChecked(cast.camera.enabled)
             idx = self.controls["camera_source"].findData(cast.camera.index)
             if idx < 0:
-                self.controls["camera_source"].addItem(f"Camera {cast.camera.index}", cast.camera.index)
+                label = "Default Webcam (Index 0)" if cast.camera.index == 0 else f"Camera {cast.camera.index} (Index {cast.camera.index})"
+                self.controls["camera_source"].addItem(label, cast.camera.index)
                 idx = self.controls["camera_source"].findData(cast.camera.index)
             self.controls["camera_source"].setCurrentIndex(max(0, idx))
             self.controls["show_hand_skeleton"].setChecked(cast.keyboard.show_skeleton)
@@ -1448,6 +1512,7 @@ class MainWindow(QMainWindow):
         self._mouse_sensitivity_changed(self.controls["mouse_sensitivity"].value())
         self._mouse_smoothness_changed(self.controls["mouse_smoothness"].value())
         self._mouse_dead_zone_changed(self.controls["mouse_dead_zone"].value())
+        self._update_camera_source_feedback()
         self._apply_window_theme(cast.general.theme)
         self._push_live_overlay_settings()
         self._update_launch_button()
@@ -1477,6 +1542,7 @@ class MainWindow(QMainWindow):
         value = self.controls["camera_source"].itemData(index)
         if value is not None:
             self._update_camera(index=int(value))
+        self._update_camera_source_feedback()
 
     def _theme_changed(self, value: str) -> None:
         self._update_general(theme=value)
