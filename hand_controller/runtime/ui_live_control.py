@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+import threading
 import traceback
 from typing import TYPE_CHECKING
 
@@ -9,7 +10,7 @@ import cv2
 from ..config.settings import AppConfig
 from ..controllers.keyboard_controller import KeyboardUpdate
 from ..gestures import MouseClickGestureState
-from ..ml import MLPrediction
+from ..ml import MLPrediction, MLPredictor
 from ..runtime.control_engine import LiveControlEngine
 from ..runtime.state import Mode, RuntimeState
 from ..ui.payloads import OverlayKeyRect, OverlayPayload, OverlayPointer
@@ -20,6 +21,10 @@ from ..vision.models import SelectedHands, VisionResult
 if TYPE_CHECKING:
     from ..ui.main_window import MainWindow
     from ..ui.signals import OverlaySignalBus
+
+
+_UI_LIVE_WARMUP_LOCK = threading.Lock()
+_UI_LIVE_WARMUP_STARTED = False
 
 
 def _screen_xy(x_norm: float, y_norm: float, screen_width: int, screen_height: int) -> tuple[int, int]:
@@ -240,6 +245,43 @@ def run_ui_live_worker(
         raise
 
 
+def _prewarm_ui_live_components(config: AppConfig) -> None:
+    try:
+        MLPredictor.try_create(config.ml)
+    except Exception:
+        pass
+
+    try:
+        tracker = HandTracker(
+            max_num_hands=config.tracker.max_num_hands,
+            min_detection_confidence=config.tracker.min_detection_confidence,
+            min_tracking_confidence=config.tracker.min_tracking_confidence,
+        )
+    except Exception:
+        return
+
+    try:
+        tracker.close()
+    except Exception:
+        pass
+
+
+def _start_ui_live_warmup(config: AppConfig) -> None:
+    global _UI_LIVE_WARMUP_STARTED
+    with _UI_LIVE_WARMUP_LOCK:
+        if _UI_LIVE_WARMUP_STARTED:
+            return
+        _UI_LIVE_WARMUP_STARTED = True
+
+    thread = threading.Thread(
+        target=_prewarm_ui_live_components,
+        args=(config,),
+        name="ui-live-prewarm",
+        daemon=True,
+    )
+    thread.start()
+
+
 def run_ui_live_control(config: AppConfig) -> None:
     try:
         import mediapipe  # noqa: F401
@@ -267,5 +309,6 @@ def run_ui_live_control(config: AppConfig) -> None:
             ""
         ),
     )
+    _start_ui_live_warmup(config)
     window.show()
     app.exec_()
