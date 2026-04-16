@@ -31,7 +31,7 @@ from PyQt5.QtWidgets import (
 )
 
 from ..config.settings import AppConfig, build_factory_default_config
-from ..vision.camera import CameraSource, detect_available_cameras
+from ..vision.camera import CameraSource, detect_available_cameras, probe_camera_index
 from .overlay_window import OverlayWindow
 from .signals import OverlaySignalBus
 
@@ -965,6 +965,42 @@ class CameraRefreshThread(QThread):
         self.refreshed.emit(sources)
 
 
+class LaunchPreflightThread(QThread):
+    prepared = pyqtSignal(object)
+    failed = pyqtSignal(str)
+
+    def __init__(self, *, preferred_index: int, width: int, height: int, max_index: int = 5) -> None:
+        super().__init__()
+        self._preferred_index = preferred_index
+        self._width = width
+        self._height = height
+        self._max_index = max_index
+
+    def run(self) -> None:  # noqa: D401
+        try:
+            probe_ok = probe_camera_index(
+                index=self._preferred_index,
+                width=self._width,
+                height=self._height,
+            )
+            sources = [] if probe_ok else detect_available_cameras(
+                max_index=self._max_index,
+                width=self._width,
+                height=self._height,
+                include_placeholder=False,
+            )
+        except Exception as exc:
+            self.failed.emit(str(exc))
+            return
+        self.prepared.emit(
+            {
+                'preferred_index': self._preferred_index,
+                'probe_ok': probe_ok,
+                'available_sources': sources,
+            }
+        )
+
+
 class MainWindow(QMainWindow):
     def __init__(
         self,
@@ -999,6 +1035,8 @@ class MainWindow(QMainWindow):
         self.value_labels: dict[str, QLabel] = {}
         self.camera_info_label: QLabel | None = None
         self._camera_refresh_thread: CameraRefreshThread | None = None
+        self._launch_preflight_thread: LaunchPreflightThread | None = None
+        self._launch_pending = False
         self.camera_sources = self._detect_camera_sources()
         self._status_dot: StatusDot | None = None
 
@@ -1423,11 +1461,17 @@ class MainWindow(QMainWindow):
 
     def _update_launch_button(self) -> None:
         button = self.controls["launch"]
-        button.setText(self.stop_button_label.upper() if self.running else self.start_button_label.upper())
+        if self.running:
+            button.setText(self.stop_button_label.upper())
+        elif self._launch_pending:
+            button.setText("STARTING...")
+        else:
+            button.setText(self.start_button_label.upper())
         if isinstance(button, SidebarPillButton):
             button.set_icon_kind("stop" if self.running else "play")
         if self._status_dot is not None:
             self._status_dot.set_running(self.running)
+        button.setEnabled(not self._launch_pending)
         button.setProperty("running", "true" if self.running else "false")
         button.style().unpolish(button)
         button.style().polish(button)
@@ -1551,20 +1595,14 @@ class MainWindow(QMainWindow):
         current_index = self.working_config.camera.index
         return next((source for source in self.camera_sources if source.index == current_index), None)
 
-    def _launch_camera_preflight(
+    def _resolve_camera_preflight_result(
         self,
         *,
         preferred_index: int,
+        available_sources: list[CameraSource],
         show_dialogs: bool,
         keep_previous_index: int | None = None,
     ) -> AppConfig | None:
-        launch_config = self.working_config
-        available_sources = detect_available_cameras(
-            max_index=5,
-            width=launch_config.camera.width,
-            height=launch_config.camera.height,
-            include_placeholder=False,
-        )
         if not available_sources:
             if show_dialogs:
                 QMessageBox.warning(
@@ -1600,6 +1638,34 @@ class MainWindow(QMainWindow):
 
         self._apply_camera_source_list(available_sources, preferred_index=preferred_index)
         return self.working_config
+
+    def _launch_camera_preflight(
+        self,
+        *,
+        preferred_index: int,
+        show_dialogs: bool,
+        keep_previous_index: int | None = None,
+    ) -> AppConfig | None:
+        launch_config = self.working_config
+        if probe_camera_index(
+            index=preferred_index,
+            width=launch_config.camera.width,
+            height=launch_config.camera.height,
+        ):
+            return launch_config
+
+        available_sources = detect_available_cameras(
+            max_index=5,
+            width=launch_config.camera.width,
+            height=launch_config.camera.height,
+            include_placeholder=False,
+        )
+        return self._resolve_camera_preflight_result(
+            preferred_index=preferred_index,
+            available_sources=available_sources,
+            show_dialogs=show_dialogs,
+            keep_previous_index=keep_previous_index,
+        )
 
     def _block(self, key: str, block: bool) -> None:
         widget = self.controls.get(key)
@@ -1764,8 +1830,68 @@ class MainWindow(QMainWindow):
         self.working_config = replace(defaults, tuning_path=self.working_config.tuning_path)
         self._sync_widgets_from_config()
 
+    def _set_launch_pending(self, pending: bool, *, info_text: str | None = None) -> None:
+        self._launch_pending = pending
+        if pending:
+            self._set_camera_source_controls_enabled(False, info_text=info_text or "Checking selected camera...")
+        else:
+            self._set_camera_source_controls_enabled(True)
+            self._update_camera_source_feedback()
+        self._update_launch_button()
+
+    def _start_launch_preflight(self, *, preferred_index: int) -> None:
+        if self._launch_preflight_thread is not None and self._launch_preflight_thread.isRunning():
+            return
+        self._set_launch_pending(True, info_text="Checking selected camera...")
+        thread = LaunchPreflightThread(
+            preferred_index=preferred_index,
+            width=self.working_config.camera.width,
+            height=self.working_config.camera.height,
+            max_index=5,
+        )
+        thread.prepared.connect(self._launch_preflight_finished)
+        thread.failed.connect(self._launch_preflight_failed)
+        thread.finished.connect(self._launch_preflight_cleanup)
+        self._launch_preflight_thread = thread
+        thread.start()
+
+    @pyqtSlot(object)
+    def _launch_preflight_finished(self, payload: object) -> None:
+        if not isinstance(payload, dict):
+            self._launch_preflight_failed("Launch preflight returned an invalid result.")
+            return
+
+        self._set_launch_pending(False)
+
+        preferred_index = int(payload.get("preferred_index", self.working_config.camera.index))
+        if bool(payload.get("probe_ok", False)):
+            prepared_config = self.working_config
+        else:
+            raw_sources = payload.get("available_sources", [])
+            available_sources = raw_sources if isinstance(raw_sources, list) else []
+            prepared_config = self._resolve_camera_preflight_result(
+                preferred_index=preferred_index,
+                available_sources=available_sources,
+                show_dialogs=True,
+            )
+
+        if prepared_config is None:
+            return
+        self._launch_worker(prepared_config, minimize_on_start=prepared_config.general.minimize_after_launch)
+
+    @pyqtSlot(str)
+    def _launch_preflight_failed(self, message: str) -> None:
+        self._set_launch_pending(False)
+        QMessageBox.warning(self, "Camera Check Failed", message or "Unable to verify the selected camera before launch.")
+
+    @pyqtSlot()
+    def _launch_preflight_cleanup(self) -> None:
+        self._launch_preflight_thread = None
+
     @pyqtSlot()
     def toggle_worker(self) -> None:
+        if self._launch_pending:
+            return
         if self.running:
             self.stop_worker()
         else:
@@ -1789,19 +1915,13 @@ class MainWindow(QMainWindow):
             self.showMinimized()
 
     def start_worker(self) -> None:
-        if self.running:
+        if self.running or self._launch_pending:
             return
         launch_config = self.working_config
         if not launch_config.camera.enabled:
             QMessageBox.warning(self, "Camera Disabled", "Enable Camera first before launching the app.")
             return
-        prepared_config = self._launch_camera_preflight(
-            preferred_index=launch_config.camera.index,
-            show_dialogs=True,
-        )
-        if prepared_config is None:
-            return
-        self._launch_worker(prepared_config, minimize_on_start=prepared_config.general.minimize_after_launch)
+        self._start_launch_preflight(preferred_index=launch_config.camera.index)
 
     def stop_worker(self) -> None:
         if not self.running:
@@ -1831,5 +1951,7 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event) -> None:  # noqa: N802
         if self._camera_refresh_thread is not None and self._camera_refresh_thread.isRunning():
             self._camera_refresh_thread.wait(1500)
+        if self._launch_preflight_thread is not None and self._launch_preflight_thread.isRunning():
+            self._launch_preflight_thread.wait(5000)
         self.stop_worker()
         event.accept()

@@ -167,6 +167,26 @@ def detect_available_cameras(
     return _label_camera_sources(detected_indices, device_names=_windows_camera_names())
 
 
+
+def probe_camera_index(*, index: int, width: int = 640, height: int = 480) -> bool:
+    try:
+        import cv2
+    except ModuleNotFoundError:
+        return False
+
+    with _quiet_cv_logging(cv2):
+        cap, _ = _open_capture(cv2, index=index, width=width, height=height)
+    if cap is None:
+        return False
+    try:
+        return True
+    finally:
+        try:
+            cap.release()
+        except Exception:
+            pass
+
+
 class Camera:
     """Small OpenCV camera wrapper with explicit lifecycle control."""
 
