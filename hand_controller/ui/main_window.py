@@ -1037,6 +1037,8 @@ class MainWindow(QMainWindow):
         self._camera_refresh_thread: CameraRefreshThread | None = None
         self._launch_preflight_thread: LaunchPreflightThread | None = None
         self._launch_pending = False
+        self._launch_preflight_should_minimize = False
+        self._launch_pending_minimized = False
         self.camera_sources = self._detect_camera_sources()
         self._status_dot: StatusDot | None = None
 
@@ -1839,10 +1841,22 @@ class MainWindow(QMainWindow):
             self._update_camera_source_feedback()
         self._update_launch_button()
 
+    def _restore_from_pending_launch_minimize(self) -> None:
+        if not self._launch_pending_minimized:
+            return
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+        self._launch_pending_minimized = False
+
     def _start_launch_preflight(self, *, preferred_index: int) -> None:
         if self._launch_preflight_thread is not None and self._launch_preflight_thread.isRunning():
             return
+        self._launch_preflight_should_minimize = bool(self.working_config.general.minimize_after_launch)
         self._set_launch_pending(True, info_text="Checking selected camera...")
+        if self._launch_preflight_should_minimize:
+            self.showMinimized()
+            self._launch_pending_minimized = True
         thread = LaunchPreflightThread(
             preferred_index=preferred_index,
             width=self.working_config.camera.width,
@@ -1866,7 +1880,9 @@ class MainWindow(QMainWindow):
         preferred_index = int(payload.get("preferred_index", self.working_config.camera.index))
         if bool(payload.get("probe_ok", False)):
             prepared_config = self.working_config
+            minimize_on_start = self._launch_preflight_should_minimize and not self._launch_pending_minimized
         else:
+            self._restore_from_pending_launch_minimize()
             raw_sources = payload.get("available_sources", [])
             available_sources = raw_sources if isinstance(raw_sources, list) else []
             prepared_config = self._resolve_camera_preflight_result(
@@ -1874,14 +1890,20 @@ class MainWindow(QMainWindow):
                 available_sources=available_sources,
                 show_dialogs=True,
             )
+            minimize_on_start = self._launch_preflight_should_minimize
 
         if prepared_config is None:
+            self._launch_preflight_should_minimize = False
             return
-        self._launch_worker(prepared_config, minimize_on_start=prepared_config.general.minimize_after_launch)
+        self._launch_worker(prepared_config, minimize_on_start=minimize_on_start)
+        self._launch_preflight_should_minimize = False
+        self._launch_pending_minimized = False
 
     @pyqtSlot(str)
     def _launch_preflight_failed(self, message: str) -> None:
         self._set_launch_pending(False)
+        self._restore_from_pending_launch_minimize()
+        self._launch_preflight_should_minimize = False
         QMessageBox.warning(self, "Camera Check Failed", message or "Unable to verify the selected camera before launch.")
 
     @pyqtSlot()
