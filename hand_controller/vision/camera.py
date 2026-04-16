@@ -16,12 +16,16 @@ class CameraSource:
 
 
 def _backend_candidates(cv2: Any) -> list[int | None]:
-    candidates: list[int | None] = [None]
+    candidates: list[int | None] = []
     if sys.platform == "win32":
-        for attr in ("CAP_MSMF", "CAP_DSHOW"):
+        # Prefer DirectShow first on Windows. It opens much faster on this repo's
+        # target hardware and still falls back cleanly if unavailable.
+        for attr in ("CAP_DSHOW", "CAP_MSMF"):
             value = getattr(cv2, attr, None)
             if isinstance(value, int) and value not in candidates:
                 candidates.append(value)
+    if None not in candidates:
+        candidates.append(None)
     return candidates
 
 

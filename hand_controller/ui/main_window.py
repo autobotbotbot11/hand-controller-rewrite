@@ -1849,11 +1849,24 @@ class MainWindow(QMainWindow):
         self.activateWindow()
         self._launch_pending_minimized = False
 
+    def _show_prelaunch_overlay(self) -> None:
+        if self.overlay is not None:
+            return
+        self.overlay = OverlayWindow(self.working_config.keyboard)
+
+    def _close_prelaunch_overlay(self) -> None:
+        if self.running or self.overlay_bus is not None:
+            return
+        if self.overlay is not None:
+            self.overlay.close()
+            self.overlay = None
+
     def _start_launch_preflight(self, *, preferred_index: int) -> None:
         if self._launch_preflight_thread is not None and self._launch_preflight_thread.isRunning():
             return
         self._launch_preflight_should_minimize = bool(self.working_config.general.minimize_after_launch)
         self._set_launch_pending(True, info_text="Checking selected camera...")
+        self._show_prelaunch_overlay()
         if self._launch_preflight_should_minimize:
             self.showMinimized()
             self._launch_pending_minimized = True
@@ -1882,6 +1895,7 @@ class MainWindow(QMainWindow):
             prepared_config = self.working_config
             minimize_on_start = self._launch_preflight_should_minimize and not self._launch_pending_minimized
         else:
+            self._close_prelaunch_overlay()
             self._restore_from_pending_launch_minimize()
             raw_sources = payload.get("available_sources", [])
             available_sources = raw_sources if isinstance(raw_sources, list) else []
@@ -1893,6 +1907,7 @@ class MainWindow(QMainWindow):
             minimize_on_start = self._launch_preflight_should_minimize
 
         if prepared_config is None:
+            self._close_prelaunch_overlay()
             self._launch_preflight_should_minimize = False
             return
         self._launch_worker(prepared_config, minimize_on_start=minimize_on_start)
@@ -1902,6 +1917,7 @@ class MainWindow(QMainWindow):
     @pyqtSlot(str)
     def _launch_preflight_failed(self, message: str) -> None:
         self._set_launch_pending(False)
+        self._close_prelaunch_overlay()
         self._restore_from_pending_launch_minimize()
         self._launch_preflight_should_minimize = False
         QMessageBox.warning(self, "Camera Check Failed", message or "Unable to verify the selected camera before launch.")
@@ -1920,7 +1936,10 @@ class MainWindow(QMainWindow):
             self.start_worker()
 
     def _launch_worker(self, launch_config: AppConfig, *, minimize_on_start: bool) -> None:
-        self.overlay = OverlayWindow(launch_config.keyboard)
+        if self.overlay is None:
+            self.overlay = OverlayWindow(launch_config.keyboard)
+        else:
+            self.overlay.apply_settings(launch_config.keyboard)
         self.overlay_bus = OverlaySignalBus()
         self.overlay_bus.update_overlay.connect(self.overlay.apply_payload)
         self.overlay_bus.update_overlay_settings.connect(self.overlay.apply_settings)
