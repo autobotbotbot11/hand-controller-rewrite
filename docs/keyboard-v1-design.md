@@ -1,5 +1,14 @@
 # Keyboard V1 Design Contract
 
+Historical note:
+- this file is a keyboard planning/design reference
+- it is not the main current source of truth for the whole app anymore
+- for the current app state and latest behaviors, prefer:
+  - `docs/handoff.md`
+  - `docs/gesture-spec.md`
+  - `docs/architecture.md`
+  - `docs/phase-plan.md`
+
 This document freezes the intended keyboard design before the rewrite moves further.
 
 The goal is not just to make the keyboard work.

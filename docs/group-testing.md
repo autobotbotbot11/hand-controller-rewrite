@@ -27,6 +27,8 @@ This starts the current live app path:
 - mouse mode
 - keyboard mode
 - ML `toggle`, `hold`, `undo`, `redo`
+- async camera refresh and launch preflight
+- dark mode by default
 
 It uses:
 - `tuning.testing.json`
@@ -42,6 +44,8 @@ It uses:
 - ML `toggle` on/off
 - ML `hold`
 - `undo` / `redo`
+- side-view safety
+  - rule-based clicks and keyboard pinches should not fire easily when the hand is too side-view
 - keyboard mode switch
 - typing on the `ABC` page
 - switching to the `123/symbols` page
@@ -52,6 +56,12 @@ It uses:
 - `Enter`
 - `ESC`
 - `TAB`
+- `Camera Source`
+  - `Refresh`
+  - switching sources if another camera is connected
+- launch feel
+  - `LAUNCH` should minimize quickly
+  - overlay/selfie box should appear quickly after launch
 
 ## Feedback format
 
@@ -64,7 +74,10 @@ Use simple notes like this:
 - drag and drop: good / bad
 - ML toggle: good / bad
 - ML hold: good / bad
+- side-view safety: good / bad
 - keyboard typing: good / bad
+- camera source / refresh: good / bad
+- launch speed / startup feel: good / bad
 - keys with no output: list them
 - confusing behavior: describe it briefly
 

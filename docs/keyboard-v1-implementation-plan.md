@@ -1,5 +1,14 @@
 # Keyboard V1 Implementation Plan
 
+Historical note:
+- this file is a keyboard implementation-planning reference
+- it may still mention old phase wording and older intermediate assumptions
+- for the current app state and latest behaviors, prefer:
+  - `docs/handoff.md`
+  - `docs/gesture-spec.md`
+  - `docs/architecture.md`
+  - `docs/phase-plan.md`
+
 This document turns the keyboard design contract into a practical implementation sequence.
 
 The goal is to implement Keyboard V1 without destabilizing the already-working mouse path.

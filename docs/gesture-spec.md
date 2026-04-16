@@ -6,6 +6,7 @@ This document freezes the meaning of each gesture before implementation starts.
 - `control_enabled`: when `False`, recognition still runs, but control actions are blocked.
 - `mode`: `mouse` or `keyboard`.
 - `movement_enabled`: mouse movement is allowed only when all required gates pass.
+- `press_gestures_safe`: shared safety gate for rule-based press-like gestures.
 
 ## MLP classes
 
@@ -51,6 +52,23 @@ These labels may still be predicted by the existing model, but they will not dri
 - Used as a safety gate for mouse control.
 - If palm is not facing the camera, mouse movement is disabled.
 
+### Press safety gate
+- Rule-based press gestures must also pass a shared hand-view safety check.
+- The check uses:
+  - thumb/pinky palm-facing ordering
+  - palm width vs palm length ratio
+  - palm-side depth skew as a supporting signal
+- Purpose: block accidental press-like actions when the hand is too side-view or visually compressed.
+- This gate applies to:
+  - left click
+  - double click
+  - right click
+  - drag start
+  - keyboard toggle
+  - keyboard tap / backspace / shift-related pinches
+- It does not automatically cancel an already active drag.
+- It is intentionally a safety layer only; it does not replace the existing click/toggle logic.
+
 ### Left click
 - Physical pose: thumb-index pinch.
 - Runtime action: quick pinch-and-release = single left click.
@@ -69,9 +87,10 @@ These labels may still be predicted by the existing model, but they will not dri
 - Release action: releasing the pinch ends the drag.
 
 ### Keyboard toggle
-- Physical pose: thumb-ring pinch.
+- Physical pose: thumb-ring hold.
 - Runtime action: toggle `mode` between `mouse` and `keyboard`.
 - This replaces the two-hand keyboard activation logic from codebase 2.
+- Safety note: it must pass both the palm-facing rule and the shared press-safety gate.
 
 ### Keyboard input
 - Keyboard mode uses the cleaner codebase 1 behavior:
@@ -79,6 +98,7 @@ These labels may still be predicted by the existing model, but they will not dri
   - thumb-index pinch confirms a key press
   - thumb-middle pinch sends backspace
   - thumb-pinky pinch arms one-shot shift for the next letter key press
+- Safety note: these pinches are blocked when `press_gestures_safe` fails.
 
 ## Mouse mode rules
 - Mouse mode only produces actions when `control_enabled` is `True`.
@@ -87,6 +107,7 @@ These labels may still be predicted by the existing model, but they will not dri
   - `mode == mouse`
   - palm-facing gate passes
   - `hold` is not active
+- Rule-based click/drag-start gestures also require `press_gestures_safe == True`.
 - Clicking is blocked while `hold` is active.
 - During a left pinch, movement freezes only until drag starts.
 - During a right pinch, movement stays frozen until the pinch is released.
@@ -97,6 +118,8 @@ These labels may still be predicted by the existing model, but they will not dri
 - Keyboard interaction logic comes from the codebase 1 design, not from the codebase 2 two-hand idle logic.
 - `hold` has no special meaning in keyboard mode for v1.
 - `undo` and `redo` are ignored in keyboard mode for v1.
+- If `control_enabled` becomes `False` while keyboard mode was active, the keyboard overlay hides immediately.
+- Re-enabling control restores the previous mode instead of forcibly switching back to mouse mode.
 
 ## Removed or rejected behaviors
 - No Alt+Tab action from `hold`.

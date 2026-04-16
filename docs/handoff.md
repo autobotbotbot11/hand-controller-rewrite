@@ -56,7 +56,7 @@ These decisions are intentional and should not be changed casually.
 
 ### Keyboard
 - Keyboard logic should follow the better design from `hand_controller`.
-- Keyboard toggle is rule-based thumb-ring pinch.
+- Keyboard toggle is a rule-based thumb-ring hold.
 - Do not use the two-hand idle keyboard activation logic from `touch-v15`.
 - Keyboard mode includes:
   - thumb-index pinch to type hovered key
@@ -135,6 +135,28 @@ Completed:
 - Phase K7 config exposure: the Qt overlay now reads keyboard visual settings from `KeyboardConfig`, including selfie size, pointer radius, skeleton visibility, font sizes, and status panel sizing
 - Keyboard redesign baseline: `controllers/keyboard_controller.py` now uses a 2-page model (`ABC` + `123/symbols`), fixes punctuation key output mappings, adds `Caps Lock`, and visibly changes alpha-page case for `Shift` / `Caps`
 - Current Phase 6 behavior uses configurable ML settings under the `ml` section of the tuning JSON files.
+- Main window designer adaptation: the current Qt control panel now follows the newer designer direction closely enough in both light and dark mode, with custom nav/buttons/toggles/sliders/combos/help badges and a depth-field dark background
+- Theme behavior:
+  - default theme is now `Dark`
+  - `System Default` uses the real Windows app-theme registry value when available and falls back to the Qt palette heuristic otherwise
+- Camera-source hardening:
+  - camera source labels now use best-effort Windows device names when available
+  - camera refresh is asynchronous
+  - launch-time camera fallback/feedback exists
+  - live camera switching while running is supported through a controlled restart path
+  - Windows camera open now prefers `CAP_DSHOW` first because it is faster on the target machine
+- Launch/startup hardening:
+  - launch preflight now runs off the UI thread
+  - the main window can minimize immediately while launch verification continues
+  - the overlay placeholder can appear before the full worker is ready
+  - UI-live startup now prewarms ML and MediaPipe in the background to reduce perceived launch delay
+- Rule-based safety hardening:
+  - all rule-based press-like gestures now share a hand-view safety gate to reduce side-view false positives
+  - this covers left/right/double click, drag start, keyboard toggle, and keyboard typing pinches
+  - movement is not fully blocked by this gate; it is only for press-like activations
+- Control toggle polish:
+  - if the user is in keyboard mode and turns control off with the ML `toggle`, the keyboard overlay hides immediately
+  - turning control back on restores the previous mode instead of forcing mouse mode
 
 Repo-local source of truth:
 - `docs/gesture-spec.md`
@@ -151,10 +173,15 @@ Current package files:
 - `hand_controller/runtime/control_engine.py`
 - `hand_controller/runtime/validation.py`
 - `hand_controller/ml/labels.py`
+- `hand_controller/vision/camera.py`
+- `hand_controller/vision/hand_tracker.py`
+- `hand_controller/gestures/safety.py`
 - `hand_controller/ui/overlay_window.py`
 - `hand_controller/controllers/keyboard_controller.py`
 - `hand_controller/controllers/mode_toggle.py`
 - `hand_controller/gestures/hand_pinches.py`
+- `hand_controller/gestures/mouse_clicks.py`
+- `hand_controller/controllers/mouse_controller.py`
 - `hand_controller/ui/main_window.py`
 - `hand_controller/ui/overlay_window.py`
 - `hand_controller/ui/payloads.py`
@@ -176,58 +203,36 @@ Smoke tests already passed:
 
 ## Next exact phase
 
-Current validation task:
-- run `python -m hand_controller --validate`
-- confirm the rewrite resolves ML artifacts from `hand-controller-rewrite/artifacts/`
-- confirm the validator reports `ml_uses_local_artifacts=True`
-- run `python -m hand_controller --ui-live --tuning .\\tuning.local.json`
-- confirm keyboard visual tuning now responds to JSON config changes without Python edits
-- install `requirements.txt` if the full app dependencies are not present yet
-- run `python -m hand_controller --ui-smoke`
-- confirm the control panel window opens
-- click Start and confirm the transparent fullscreen overlay opens
-- confirm Stop closes the overlay cleanly
-- confirm closing the control panel also shuts down the overlay/worker cleanly
-- confirm the overlay can render mock keyboard rectangles, pointers, and skeleton lines
-- run `python -m hand_controller --ui-live --tuning .\\tuning.local.json`
-- confirm the real camera/MediaPipe loop starts from the control panel window
-- confirm mouse mode still works while using the Qt overlay path
-- confirm keyboard mode renders the full data-driven keyboard on the transparent overlay instead of the OpenCV window
-- confirm live skeleton lines, pointer markers, selfie preview, and status text appear on the overlay
-- confirm the full practical key set is present and usable on the overlay
-- confirm layout sizing and spacing remain sensible on the user's display
-- confirm mouse <-> keyboard transitions feel stable in both `--control-smoke` and `--ui-live`
-- confirm switching modes does not leave stale drag/click state behind
-- confirm punctuation keys now produce output
-- confirm the `ABC` / `123` page switch feels usable
-- confirm `ESC` sits beside `Q` and `TAB` sits beside `A` on the `ABC` page
-- confirm `Shift` visibly changes the alpha page
-- confirm `Caps Lock` visibly changes the alpha page and behaves predictably
-- install `requirements.txt` if the ML dependencies are not present yet
-- run `python -m hand_controller --control-smoke`
-- confirm left click via quick thumb-index pinch-and-release
-- confirm right click via thumb-middle pinch down
-- confirm two quick left tap cycles feel easier than before
-- confirm left-hold starts drag and releasing the pinch ends drag
-- confirm cursor freezes before drag starts, not for the entire drag
-- adjust `tuning.local.json` if the click feel still needs experimentation
-- confirm `toggle` can turn control off and on again while the preview keeps running
-- confirm `toggle` requires a short sustained hold before firing
-- confirm `hold` freezes movement and blocks clicks
-- confirm `undo` and `redo` hotkeys fire once per gesture
-- confirm thumb-ring hold toggles into keyboard mode and back to mouse mode
-- confirm thumb-index pinch types the hovered key in keyboard mode
-- confirm thumb-middle pinch sends backspace in keyboard mode
-- confirm thumb-pinky pinch arms one-shot Shift for the next letter key press
+Current state:
+- the rewrite is no longer in "build the baseline" mode
+- the app is in stabilization, final UX hardening, and packaging-planning mode
+- main window designer adaptation is effectively done enough
+- recent work has focused on:
+  - false-positive reduction
+  - camera robustness
+  - startup feel
+  - final control-panel polish
 
-Next implementation phase after validation:
-- Phase K8: focused keyboard-flaw validation/refinement pass
+Recommended next work, in order:
+1. group testing / real-user validation
+   - run `.\run-tester.ps1`
+   - collect feedback using `docs/group-testing.md`
+2. packaging / actual app distribution planning
+   - portable packaged Windows app first
+   - installer only after the portable build is stable
+3. remaining UX edge cases only if testers surface them
+   - keyboard feel
+   - camera switching edge cases
+   - overlay/selfie behavior
+
+If another AI continues from here, do not assume the next task is "Phase K8".
+The baseline phases are already implemented. The likely next task is packaging or tester-driven bug fixing.
 
 ## Important warnings for future work
 
 - Stable mouse movement is the top priority of the rewrite.
 - Movement should adapt the useful algorithmic ideas from `touch-v15` without copying its full architecture.
-- The rewrite should start synchronous and simple; add threading later only if it is truly needed.
+- The rewrite originally started synchronous and simple; selective background threading now exists only where profiling justified it.
 - Prefer the rewrite repo's local `artifacts/` directory as the primary ML source.
 - `hold` must not trigger Alt+Tab.
 - `toggle` must not kill recognition.
@@ -235,6 +240,9 @@ Next implementation phase after validation:
 - Keyboard behavior should come from the cleaner `hand_controller` design.
 - `hold`, `undo`, and `redo` should stay inactive while in keyboard mode.
 - Clicking should stay rule-based even if the MLP predicts click labels.
+- Do not remove the shared hand-view press-safety gate unless a better global safety replacement exists.
+- Do not remove the Windows `CAP_DSHOW` preference casually; it materially improved startup on the target machine.
+- Do not reintroduce form-style `Apply / Discard` UX into the main window; the app's current settings model is intentionally live-change oriented.
 
 ## If another AI continues this work
 

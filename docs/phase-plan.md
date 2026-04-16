@@ -101,3 +101,19 @@ Exit criteria:
 
 Exit criteria:
 - Repo is ready for handoff and presentation.
+
+## Current checkpoint
+- Phases 0 to 11 are effectively implemented in the rewrite.
+- Current work is no longer "build the baseline."
+- Current work is:
+  - stabilization
+  - designer-UI adaptation polish
+  - packaging / shareable app planning
+  - final tester-facing hardening
+
+Recent hardening already added after the original phase sequence:
+- global side-view safety for rule-based press gestures
+- camera source labels, refresh, fallback, and live switching
+- async launch preflight
+- launch-time overlay placeholder
+- targeted startup prewarm for ML and MediaPipe

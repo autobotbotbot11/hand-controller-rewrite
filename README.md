@@ -13,6 +13,9 @@ Hand-tracking mouse and keyboard controller ito na gumagamit ng:
 - keyboard mode with transparent overlay
 - 2-page keyboard (`ABC` + `123/symbols`)
 - `Shift`, `Caps Lock`, `Backspace`, `Space`, `Enter`, `ESC`, `TAB`
+- side-view safety para sa rule-based press gestures
+- camera source refresh, fallback, at live camera switching
+- dark mode by default
 
 ## Quick Start Para Sa Testers
 Kung ite-test mo lang ang current app, ito lang ang gawin:
@@ -65,6 +68,7 @@ python -m hand_controller --ui-live --tuning .\tuning.testing.json
 - ML `toggle`: on/off ng control without stopping recognition
 - ML `undo`: `Ctrl+Z`
 - ML `redo`: `Ctrl+Y`
+- note: kapag masyadong side-view ang kamay, binablock ang accidental rule-based press gestures for safety
 
 ### Keyboard Mode
 - mode switch: hold thumb + ring pinch
@@ -80,6 +84,13 @@ python -m hand_controller --ui-live --tuning .\tuning.testing.json
   Personal local adjustments
 - [tuning.recommended.json](/C:/Users/acer/school/self-study/programming/projects/computer-vision-mouse-control/hand-controller-rewrite/tuning.recommended.json)
   Optional reference preset
+
+## Camera Source Notes
+- `Camera Source` uses real camera indices internally.
+- Kapag available sa Windows, best-effort na lumalabas ang hardware names sa UI.
+- `Refresh` re-scans available cameras without restarting the app.
+- while running, changing `Camera Source` does a controlled live switch instead of waiting for the next launch.
+- if the saved camera disappears, the app can fall back to another usable source.
 
 ## Ibang Useful Commands
 ```powershell

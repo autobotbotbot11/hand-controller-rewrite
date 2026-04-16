@@ -34,6 +34,13 @@ This rewrite keeps the code modular and intentionally separates perception, deci
 - Prefer simple synchronous runtime flow first.
 - Add threading only if profiling shows it is needed later.
 
+Current practical note:
+- the app now uses a few targeted background threads where profiling justified them:
+  - camera source refresh in the main window
+  - launch-time camera preflight
+  - UI-live prewarm for ML and MediaPipe cold start
+- these are narrow UX/performance helpers, not a general multi-threaded rewrite.
+
 ## Mouse movement strategy
 Stable movement will adapt the useful parts of codebase 2 without copying its entire runtime structure.
 
@@ -49,10 +56,37 @@ Key ideas to port:
 ## Control model
 - `control_enabled` is toggled by the MLP `toggle` gesture.
 - Recognition continues even when control is disabled.
-- `mode` is toggled by rule-based thumb-ring pinch.
+- `mode` is toggled by a rule-based thumb-ring hold.
 - Mouse clicks remain rule-based.
 - `hold` is mapped to clutch, not Alt+Tab.
 - Keyboard mode is toggled by a rule-based thumb-ring hold and typed with rule-based pinch events.
+
+## Global safety model
+- Mouse movement and rule-based press gestures are not treated the same.
+- Movement still depends primarily on the palm-facing gate and existing mouse-state rules.
+- Press-like rule-based actions now share an extra hand-view safety layer based on hand geometry.
+- That shared safety layer blocks accidental side-view activations for:
+  - left click
+  - double click
+  - right click
+  - drag start
+  - keyboard toggle
+  - keyboard typing pinches
+- The shared gate is computed once per frame and reused across controllers.
+
+## Camera and launch behavior
+- Camera source selection is still index-based at runtime.
+- The UI now uses best-effort Windows camera names when available, but indices remain the real source of truth.
+- Camera source refresh is asynchronous.
+- Launch uses an asynchronous preflight instead of blocking the UI thread.
+- The main window can minimize immediately while camera verification continues in the background.
+- The overlay placeholder can appear before the real worker loop is fully ready.
+- On Windows, camera opening now prefers `CAP_DSHOW` first because profiling showed it is faster on the target setup.
+
+## UI behavior notes
+- Main window theme defaults to `Dark`.
+- `System Default` resolves to the real Windows app-theme preference when available, and falls back to the Qt palette heuristic otherwise.
+- The UI-live path prewarms ML model loading and MediaPipe startup in the background so launch feels faster without changing runtime semantics.
 
 ## Initial scope
 - Mouse mode
