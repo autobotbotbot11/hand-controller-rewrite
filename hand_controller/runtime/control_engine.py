@@ -14,8 +14,10 @@ from ..controllers.actions import Action, Click, Hotkey, KeyPress, MouseDown, Mo
 from ..controllers.keyboard_controller import KeyboardUpdate
 from ..gestures import (
     HandPinchDetector,
+    HandViewSafety,
     MouseClickGestureState,
     MouseClickDetector,
+    analyze_hand_view_safety,
     is_palm_facing_thumb_pinky,
 )
 from ..ml import MLPrediction, MLPredictor, MLControlAdapter
@@ -50,6 +52,8 @@ class ControlFrameResult:
     mode_toggle_status: str
     drag_active: bool
     pre_hold_right_suppressed: bool
+    press_gestures_safe: bool
+    press_safety_status: str
     gesture_command_text: str
 
 
@@ -76,6 +80,7 @@ class LiveControlEngine:
         self._last_mode = self.runtime_state.mode
         self._gesture_feedback_text = ""
         self._gesture_feedback_until = 0.0
+        self._press_safety_by_hand: dict[str, bool] = {}
 
     def _set_gesture_feedback(self, text: str, now: float) -> None:
         if not text:
@@ -177,6 +182,30 @@ class LiveControlEngine:
             return False
         return (prediction.p1 or 0.0) >= self.config.ml.pre_hold_min_p1
 
+    def _analyze_hand_safety(
+        self,
+        hands,
+    ) -> dict[str, HandViewSafety]:
+        safety_by_label: dict[str, HandViewSafety] = {}
+        visible_labels: set[str] = set()
+
+        for hand in hands:
+            visible_labels.add(hand.label)
+            previously_safe = bool(self._press_safety_by_hand.get(hand.label, False))
+            safety = analyze_hand_view_safety(
+                hand,
+                mirrored_input=self.config.tracker.mirror_input,
+                previously_safe=previously_safe,
+            )
+            safety_by_label[hand.label] = safety
+            self._press_safety_by_hand[hand.label] = safety.press_safe
+
+        for label in list(self._press_safety_by_hand):
+            if label not in visible_labels:
+                self._press_safety_by_hand.pop(label, None)
+
+        return safety_by_label
+
     def process_frame(
         self,
         vision: VisionResult,
@@ -189,11 +218,19 @@ class LiveControlEngine:
 
         selected = self.selector.select(vision.hands, vision.frame_width, vision.frame_height)
         active_hand = selected.primary
+        hand_safety_by_label = self._analyze_hand_safety(vision.hands)
+        active_hand_safety = hand_safety_by_label.get(active_hand.label) if active_hand is not None else None
         palm_facing = (
-            is_palm_facing_thumb_pinky(active_hand, mirrored_input=self.config.tracker.mirror_input)
-            if active_hand is not None
-            else False
+            active_hand_safety.ordering_ok
+            if active_hand_safety is not None
+            else (
+                is_palm_facing_thumb_pinky(active_hand, mirrored_input=self.config.tracker.mirror_input)
+                if active_hand is not None
+                else False
+            )
         )
+        press_gestures_safe = active_hand_safety.press_safe if active_hand_safety is not None else False
+        press_safety_status = active_hand_safety.status if active_hand_safety is not None else "presssafe=no hand"
         self.runtime_state.active_hand_label = active_hand.label if active_hand is not None else None
         self.runtime_state.palm_facing = palm_facing
 
@@ -201,6 +238,9 @@ class LiveControlEngine:
             hands=vision.hands,
             frame_width=vision.frame_width,
             frame_height=vision.frame_height,
+            activation_allowed_by_hand={
+                label: safety.press_safe for label, safety in hand_safety_by_label.items()
+            },
         )
         active_pinch_state = pinch_states.get(active_hand.label) if active_hand is not None else None
 
@@ -244,6 +284,7 @@ class LiveControlEngine:
                     active_hand=active_hand,
                     frame_width=vision.frame_width,
                     frame_height=vision.frame_height,
+                    activation_allowed=press_gestures_safe,
                 )
             else:
                 self.click_detector.reset()
@@ -262,6 +303,7 @@ class LiveControlEngine:
                 control_enabled=self.runtime_state.control_enabled,
                 movement_allowed=movement_enabled,
                 click_enabled=click_enabled,
+                press_activation_allowed=press_gestures_safe,
                 right_click_allowed=not pre_hold_right_suppressed,
                 click_state=click_state,
                 now=now,
@@ -299,6 +341,7 @@ class LiveControlEngine:
                 control_enabled=self.runtime_state.control_enabled,
                 movement_allowed=False,
                 click_enabled=False,
+                press_activation_allowed=False,
                 right_click_allowed=False,
                 click_state=MouseClickGestureState(),
                 now=now,
@@ -331,5 +374,7 @@ class LiveControlEngine:
             mode_toggle_status=mode_toggle_update.status,
             drag_active=self.mouse_controller.state.drag_active,
             pre_hold_right_suppressed=pre_hold_right_suppressed,
+            press_gestures_safe=press_gestures_safe,
+            press_safety_status=press_safety_status,
             gesture_command_text=gesture_command_text,
         )

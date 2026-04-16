@@ -220,6 +220,7 @@ class MouseController:
         control_enabled: bool,
         movement_allowed: bool,
         click_enabled: bool,
+        press_activation_allowed: bool = True,
         right_click_allowed: bool = True,
         click_state: MouseClickGestureState | None,
         now: float,
@@ -247,6 +248,9 @@ class MouseController:
             self._cancel_left_press()
             if released_drag:
                 click_status = "Mouse | drag release"
+        elif not press_activation_allowed:
+            if not self.state.drag_active:
+                self._cancel_left_press()
         else:
             click_actions, click_status, freeze_for_click = self._handle_click_state(
                 click_state,

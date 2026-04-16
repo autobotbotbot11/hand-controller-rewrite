@@ -155,6 +155,8 @@ def _draw_control_smoke(
     mode_toggle_status: str,
     keyboard_update: KeyboardUpdate,
     pre_hold_right_suppressed: bool,
+    press_gestures_safe: bool,
+    press_safety_status: str,
 ) -> None:
     import cv2
 
@@ -244,6 +246,7 @@ def _draw_control_smoke(
             *common_parts,
             f"hold={'yes' if runtime_state.hold_active else 'no'}",
             f"clicks={'on' if runtime_state.control_enabled and not runtime_state.hold_active else 'off'}",
+            f"presssafe={'yes' if press_gestures_safe else 'no'}",
             f"prehold_r={'on' if pre_hold_right_suppressed else 'off'}",
             f"movement={'on' if movement_enabled else 'off'}",
             f"freeze={'yes' if click_freeze else 'no'}",
@@ -289,6 +292,16 @@ def _draw_control_smoke(
         max_width=max(120, width - 32),
         scale=0.60,
         color=(255, 255, 255),
+        thickness=2,
+    )
+    next_y = _draw_wrapped_text(
+        frame_bgr,
+        text=press_safety_status,
+        x=16,
+        y=next_y,
+        max_width=max(120, width - 32),
+        scale=0.55,
+        color=(160, 220, 255) if press_gestures_safe else (0, 180, 255),
         thickness=2,
     )
     if not ml_available and ml_reason:
@@ -361,6 +374,8 @@ def run_mouse_smoke(config: AppConfig) -> None:
                 mode_toggle_status=frame_result.mode_toggle_status,
                 keyboard_update=frame_result.keyboard_update,
                 pre_hold_right_suppressed=frame_result.pre_hold_right_suppressed,
+                press_gestures_safe=frame_result.press_gestures_safe,
+                press_safety_status=frame_result.press_safety_status,
             )
 
             cv2.imshow(window_name, debug_frame)

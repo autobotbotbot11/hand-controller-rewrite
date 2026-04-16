@@ -87,6 +87,8 @@ def _build_debug_tags(
     ml_available: bool,
     ml_reason: str | None,
     pre_hold_right_suppressed: bool,
+    press_gestures_safe: bool,
+    press_safety_status: str,
 ) -> tuple[str, ...]:
     active_label = selected.primary.label if selected.primary is not None else "-"
     ml_line = "  ".join(
@@ -103,6 +105,7 @@ def _build_debug_tags(
     mouse_line = "  ".join(
         [
             f"hold={'yes' if runtime_state.hold_active else 'no'}",
+            f"presssafe={'yes' if press_gestures_safe else 'no'}",
             f"prehold_r={'on' if pre_hold_right_suppressed else 'off'}",
             f"movement={'on' if movement_enabled else 'off'}",
             f"drag={'yes' if drag_active else 'no'}",
@@ -111,7 +114,7 @@ def _build_debug_tags(
             mode_toggle_status,
         ]
     )
-    tags = [ml_line, mouse_line]
+    tags = [ml_line, mouse_line, press_safety_status]
     if not ml_available and ml_reason:
         tags.append(f"ml_reason={ml_reason}")
     return tuple(tags)
@@ -208,6 +211,8 @@ def run_ui_live_worker(
                         ml_available=frame_result.ml_available,
                         ml_reason=frame_result.ml_reason,
                         pre_hold_right_suppressed=frame_result.pre_hold_right_suppressed,
+                        press_gestures_safe=frame_result.press_gestures_safe,
+                        press_safety_status=frame_result.press_safety_status,
                     ),
                 )
                 try:

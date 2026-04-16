@@ -53,10 +53,12 @@ class MouseClickDetector:
         self.settings = settings or MouseClickConfig()
         self._index_pressed: dict[str, bool] = {}
         self._middle_pressed: dict[str, bool] = {}
+        self._blocked_until_release: dict[str, dict[str, bool]] = {}
 
     def reset(self) -> None:
         self._index_pressed.clear()
         self._middle_pressed.clear()
+        self._blocked_until_release.clear()
 
     def analyze(
         self,
@@ -64,6 +66,7 @@ class MouseClickDetector:
         active_hand: DetectedHand | None,
         frame_width: int,
         frame_height: int,
+        activation_allowed: bool = True,
     ) -> MouseClickGestureState:
         if active_hand is None:
             self.reset()
@@ -82,16 +85,6 @@ class MouseClickDetector:
             THUMB_TIP_IDX,
             INDEX_TIP_IDX,
         )
-        prev_left_pressed = bool(self._index_pressed.get(label, False))
-        left_pressed = _update_press_state(
-            prev_pressed=prev_left_pressed,
-            distance_px=left_distance,
-            press_threshold=left_press_threshold,
-            release_threshold=left_release_threshold,
-        )
-        left_down = left_pressed and not prev_left_pressed
-        left_up = prev_left_pressed and not left_pressed
-
         right_distance = _distance_px(
             active_hand,
             frame_width,
@@ -99,18 +92,40 @@ class MouseClickDetector:
             THUMB_TIP_IDX,
             MIDDLE_TIP_IDX,
         )
-        prev_right_pressed = bool(self._middle_pressed.get(label, False))
-        right_pressed = _update_press_state(
-            prev_pressed=prev_right_pressed,
+
+        if not activation_allowed:
+            self._index_pressed = {label: False}
+            self._middle_pressed = {label: False}
+            self._blocked_until_release = {label: {"index": True, "middle": True}}
+            return MouseClickGestureState(
+                left_distance_px=left_distance,
+                right_distance_px=right_distance,
+            )
+
+        blocked = dict(self._blocked_until_release.get(label, {}))
+        left_pressed, left_down, left_up, blocked_left = self._resolve_press_signal(
+            prev_pressed=bool(self._index_pressed.get(label, False)),
+            distance_px=left_distance,
+            press_threshold=left_press_threshold,
+            release_threshold=left_release_threshold,
+            blocked=bool(blocked.get("index", False)),
+        )
+        right_pressed, right_down, right_up, blocked_right = self._resolve_press_signal(
+            prev_pressed=bool(self._middle_pressed.get(label, False)),
             distance_px=right_distance,
             press_threshold=right_press_threshold,
             release_threshold=right_release_threshold,
+            blocked=bool(blocked.get("middle", False)),
         )
-        right_down = right_pressed and not prev_right_pressed
-        right_up = prev_right_pressed and not right_pressed
 
         self._index_pressed = {label: left_pressed}
         self._middle_pressed = {label: right_pressed}
+        self._blocked_until_release = {
+            label: {
+                "index": blocked_left,
+                "middle": blocked_right,
+            }
+        }
 
         return MouseClickGestureState(
             left_pressed=left_pressed,
@@ -122,3 +137,27 @@ class MouseClickDetector:
             left_distance_px=left_distance,
             right_distance_px=right_distance,
         )
+
+    def _resolve_press_signal(
+        self,
+        *,
+        prev_pressed: bool,
+        distance_px: float,
+        press_threshold: float,
+        release_threshold: float,
+        blocked: bool,
+    ) -> tuple[bool, bool, bool, bool]:
+        if blocked:
+            if distance_px <= release_threshold:
+                return False, False, False, True
+            return False, False, False, False
+
+        pressed = _update_press_state(
+            prev_pressed=prev_pressed,
+            distance_px=distance_px,
+            press_threshold=press_threshold,
+            release_threshold=release_threshold,
+        )
+        down = pressed and not prev_pressed
+        up = prev_pressed and not pressed
+        return pressed, down, up, False

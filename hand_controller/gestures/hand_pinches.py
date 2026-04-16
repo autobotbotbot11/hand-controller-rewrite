@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 import math
 
@@ -40,6 +41,7 @@ class PinchSignal:
     down: bool = False
     up: bool = False
     distance_px: float | None = None
+    blocked_until_release: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,9 +57,11 @@ class HandPinchDetector:
     def __init__(self, settings: KeyboardConfig | None = None) -> None:
         self.settings = settings or KeyboardConfig()
         self._pressed: dict[str, dict[str, bool]] = {}
+        self._blocked_until_release: dict[str, dict[str, bool]] = {}
 
     def reset(self) -> None:
         self._pressed.clear()
+        self._blocked_until_release.clear()
 
     def analyze(
         self,
@@ -65,6 +69,7 @@ class HandPinchDetector:
         hands: tuple[DetectedHand, ...] | list[DetectedHand],
         frame_width: int,
         frame_height: int,
+        activation_allowed_by_hand: Mapping[str, bool] | None = None,
     ) -> dict[str, HandPinchState]:
         states: dict[str, HandPinchState] = {}
         visible_labels: set[str] = set()
@@ -73,10 +78,16 @@ class HandPinchDetector:
             label = hand.label
             visible_labels.add(label)
             prev = self._pressed.get(label, {})
+            blocked = self._blocked_until_release.get(label, {})
+            activation_allowed = True if activation_allowed_by_hand is None else bool(
+                activation_allowed_by_hand.get(label, True)
+            )
 
             index = self._build_signal(
                 hand=hand,
                 prev_pressed=bool(prev.get("index", False)),
+                prev_blocked=bool(blocked.get("index", False)),
+                activation_allowed=activation_allowed,
                 frame_width=frame_width,
                 frame_height=frame_height,
                 end_idx=INDEX_TIP_IDX,
@@ -87,6 +98,8 @@ class HandPinchDetector:
             middle = self._build_signal(
                 hand=hand,
                 prev_pressed=bool(prev.get("middle", False)),
+                prev_blocked=bool(blocked.get("middle", False)),
+                activation_allowed=activation_allowed,
                 frame_width=frame_width,
                 frame_height=frame_height,
                 end_idx=MIDDLE_TIP_IDX,
@@ -97,6 +110,8 @@ class HandPinchDetector:
             ring = self._build_signal(
                 hand=hand,
                 prev_pressed=bool(prev.get("ring", False)),
+                prev_blocked=bool(blocked.get("ring", False)),
+                activation_allowed=activation_allowed,
                 frame_width=frame_width,
                 frame_height=frame_height,
                 end_idx=RING_TIP_IDX,
@@ -107,6 +122,8 @@ class HandPinchDetector:
             pinky = self._build_signal(
                 hand=hand,
                 prev_pressed=bool(prev.get("pinky", False)),
+                prev_blocked=bool(blocked.get("pinky", False)),
+                activation_allowed=activation_allowed,
                 frame_width=frame_width,
                 frame_height=frame_height,
                 end_idx=PINKY_TIP_IDX,
@@ -121,6 +138,12 @@ class HandPinchDetector:
                 "ring": ring.pressed,
                 "pinky": pinky.pressed,
             }
+            self._blocked_until_release[label] = {
+                "index": index.blocked_until_release,
+                "middle": middle.blocked_until_release,
+                "ring": ring.blocked_until_release,
+                "pinky": pinky.blocked_until_release,
+            }
             states[label] = HandPinchState(
                 hand_label=label,
                 index=index,
@@ -132,6 +155,7 @@ class HandPinchDetector:
         for label in list(self._pressed):
             if label not in visible_labels:
                 self._pressed.pop(label, None)
+                self._blocked_until_release.pop(label, None)
 
         return states
 
@@ -140,6 +164,8 @@ class HandPinchDetector:
         *,
         hand: DetectedHand,
         prev_pressed: bool,
+        prev_blocked: bool,
+        activation_allowed: bool,
         frame_width: int,
         frame_height: int,
         end_idx: int,
@@ -154,15 +180,32 @@ class HandPinchDetector:
             THUMB_TIP_IDX,
             end_idx,
         )
+        release_threshold = base_threshold * release_multiplier
+
+        if not activation_allowed:
+            return PinchSignal(
+                distance_px=distance,
+                blocked_until_release=True,
+            )
+
+        if prev_blocked:
+            if distance <= release_threshold:
+                return PinchSignal(
+                    distance_px=distance,
+                    blocked_until_release=True,
+                )
+            prev_pressed = False
+
         pressed = _update_press_state(
             prev_pressed=prev_pressed,
             distance_px=distance,
             press_threshold=base_threshold * press_multiplier,
-            release_threshold=base_threshold * release_multiplier,
+            release_threshold=release_threshold,
         )
         return PinchSignal(
             pressed=pressed,
             down=pressed and not prev_pressed,
             up=prev_pressed and not pressed,
             distance_px=distance,
+            blocked_until_release=False,
         )
