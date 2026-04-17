@@ -23,6 +23,7 @@ from ..gestures import (
 from ..ml import MLPrediction, MLPredictor, MLControlAdapter
 from ..ml.labels import ML_LABEL_HOLD
 from ..runtime.state import Mode, RuntimeState
+from .diagnostics import log_diagnostic
 from ..vision.hand_selector import HandSelector
 from ..vision.models import SelectedHands, VisionResult
 
@@ -81,6 +82,19 @@ class LiveControlEngine:
         self._gesture_feedback_text = ""
         self._gesture_feedback_until = 0.0
         self._press_safety_by_hand: dict[str, bool] = {}
+        self._diag_last_ml_label: str | None = None
+        self._diag_last_hold_active: bool | None = None
+        self._diag_last_control_enabled: bool | None = None
+
+        if self.ml_predictor is None:
+            log_diagnostic(f"ml=unavailable reason={self.ml_reason}")
+        else:
+            log_diagnostic(
+                "ml=loaded "
+                f"model={self.ml_predictor.model_path} "
+                f"scaler={self.ml_predictor.scaler_path} "
+                f"label_encoder={self.ml_predictor.encoder_path}"
+            )
 
     def _set_gesture_feedback(self, text: str, now: float) -> None:
         if not text:
@@ -350,6 +364,48 @@ class LiveControlEngine:
             movement_status = transition_status or ("keyboard mode" if mouse_status == "Mouse | no active hand" else mouse_status)
 
         execute_actions(action_queue)
+
+        if self.runtime_state.latest_ml_label != self._diag_last_ml_label:
+            log_diagnostic(
+                "ml_label_change "
+                f"stable={self.runtime_state.latest_ml_label} "
+                f"raw={ml_prediction.raw_label} "
+                f"p1={ml_prediction.p1 if ml_prediction.p1 is not None else 'None'} "
+                f"margin={ml_prediction.margin if ml_prediction.margin is not None else 'None'} "
+                f"status={ml_update.status}"
+            )
+            self._diag_last_ml_label = self.runtime_state.latest_ml_label
+
+        if self.runtime_state.hold_active != self._diag_last_hold_active:
+            log_diagnostic(
+                "hold_change "
+                f"hold_active={self.runtime_state.hold_active} "
+                f"stable={self.runtime_state.latest_ml_label} "
+                f"raw={ml_prediction.raw_label}"
+            )
+            self._diag_last_hold_active = self.runtime_state.hold_active
+
+        if self.runtime_state.control_enabled != self._diag_last_control_enabled:
+            log_diagnostic(
+                "control_change "
+                f"control_enabled={self.runtime_state.control_enabled} "
+                f"stable={self.runtime_state.latest_ml_label}"
+            )
+            self._diag_last_control_enabled = self.runtime_state.control_enabled
+
+        if self.runtime_state.hold_active:
+            press_actions = [
+                action for action in action_queue if isinstance(action, (Click, DoubleClick, MouseDown, MouseUp))
+            ]
+            if press_actions:
+                names = ",".join(type(action).__name__ for action in press_actions)
+                log_diagnostic(
+                    "hold_conflict "
+                    f"actions={names} "
+                    f"stable={self.runtime_state.latest_ml_label} "
+                    f"raw={ml_prediction.raw_label}"
+                )
+
         gesture_command_text = self._gesture_feedback(
             actions=feedback_actions,
             click_status=click_feedback_status,

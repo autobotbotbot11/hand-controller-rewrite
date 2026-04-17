@@ -22,21 +22,23 @@ def run() -> object:
 
     detector = MouseClickDetector()
     first = detector.analyze(active_hand=left_pinch_hand, frame_width=FRAME_WIDTH, frame_height=FRAME_HEIGHT)
-    suite.check_true("left pinch enters pressed state", first.left_pressed)
-    suite.check_true("left pinch triggers down event once", first.left_down)
+    left_input = "active hand = thumb-index pinch, activation_allowed = True"
+    suite.check_true("left pinch enters pressed state", first.left_pressed, input_data=left_input)
+    suite.check_true("left pinch triggers down event once", first.left_down, input_data=left_input)
 
     second = detector.analyze(active_hand=left_pinch_hand, frame_width=FRAME_WIDTH, frame_height=FRAME_HEIGHT)
-    suite.check_true("holding the pinch keeps left_pressed true", second.left_pressed)
-    suite.check_false("holding the same pinch does not retrigger left_down", second.left_down)
+    suite.check_true("holding the pinch keeps left_pressed true", second.left_pressed, input_data="same left-pinch hand on the next frame")
+    suite.check_false("holding the same pinch does not retrigger left_down", second.left_down, input_data="same left-pinch hand on the next frame")
 
     released = detector.analyze(active_hand=released_hand, frame_width=FRAME_WIDTH, frame_height=FRAME_HEIGHT)
-    suite.check_true("releasing the pinch triggers left_up", released.left_up)
-    suite.check_false("released hand clears left_pressed", released.left_pressed)
+    suite.check_true("releasing the pinch triggers left_up", released.left_up, input_data="active hand = fingers moved apart after left pinch")
+    suite.check_false("released hand clears left_pressed", released.left_pressed, input_data="active hand = fingers moved apart after left pinch")
 
     detector = MouseClickDetector()
     right = detector.analyze(active_hand=right_pinch_hand, frame_width=FRAME_WIDTH, frame_height=FRAME_HEIGHT)
-    suite.check_true("right pinch enters pressed state", right.right_pressed)
-    suite.check_true("right pinch triggers down event", right.right_down)
+    right_input = "active hand = thumb-middle pinch, activation_allowed = True"
+    suite.check_true("right pinch enters pressed state", right.right_pressed, input_data=right_input)
+    suite.check_true("right pinch triggers down event", right.right_down, input_data=right_input)
 
     detector = MouseClickDetector()
     blocked = detector.analyze(
@@ -45,17 +47,17 @@ def run() -> object:
         frame_height=FRAME_HEIGHT,
         activation_allowed=False,
     )
-    suite.check_false("blocked gesture does not report left_pressed", blocked.left_pressed)
+    suite.check_false("blocked gesture does not report left_pressed", blocked.left_pressed, input_data="thumb-index pinch while activation_allowed = False")
     blocked_still_pinched = detector.analyze(
         active_hand=left_pinch_hand,
         frame_width=FRAME_WIDTH,
         frame_height=FRAME_HEIGHT,
         activation_allowed=True,
     )
-    suite.check_false("blocked state remains locked until release", blocked_still_pinched.left_down)
+    suite.check_false("blocked state remains locked until release", blocked_still_pinched.left_down, input_data="same pinch still held after blocked frame")
     detector.analyze(active_hand=released_hand, frame_width=FRAME_WIDTH, frame_height=FRAME_HEIGHT, activation_allowed=True)
     unblocked = detector.analyze(active_hand=left_pinch_hand, frame_width=FRAME_WIDTH, frame_height=FRAME_HEIGHT, activation_allowed=True)
-    suite.check_true("after release, the next pinch can trigger again", unblocked.left_down)
+    suite.check_true("after release, the next pinch can trigger again", unblocked.left_down, input_data="release frame followed by a new thumb-index pinch")
 
     return suite.summary()
 

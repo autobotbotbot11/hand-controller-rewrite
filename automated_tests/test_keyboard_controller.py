@@ -28,8 +28,8 @@ def run() -> object:
     controller = KeyboardController()
     layout = controller.layout_for_frame(FRAME_WIDTH, FRAME_HEIGHT)
     tokens = {key.token for key in layout}
-    suite.check_true("default layout contains ESC", "ESC" in tokens)
-    suite.check_true("default layout contains SPACE", "SPACE" in tokens)
+    suite.check_true("default layout contains ESC", "ESC" in tokens, input_data="default keyboard layout for a 1200x700 frame")
+    suite.check_true("default layout contains SPACE", "SPACE" in tokens, input_data="default keyboard layout for a 1200x700 frame")
 
     controller = KeyboardController()
     hand_a = hand_over_key(controller, "A")
@@ -40,8 +40,8 @@ def run() -> object:
         frame_height=FRAME_HEIGHT,
         now=1.0,
     )
-    suite.check_equal("plain letter press emits one action", len(update.actions), 1)
-    suite.check_equal("plain letter press types lowercase a", update.actions[0], KeyPress("a"))
+    suite.check_equal("plain letter press emits one action", len(update.actions), 1, input_data='Right hand index finger centered on key "A" with index pinch down')
+    suite.check_equal("plain letter press types lowercase a", update.actions[0], KeyPress("a"), input_data='Right hand index finger centered on key "A" with index pinch down')
 
     controller = KeyboardController()
     shift_hand = hand_over_key(controller, "SHIFT")
@@ -52,7 +52,7 @@ def run() -> object:
         frame_height=FRAME_HEIGHT,
         now=1.0,
     )
-    suite.check_true("shift key arms one-shot shift", update_shift.shift_armed)
+    suite.check_true("shift key arms one-shot shift", update_shift.shift_armed, input_data='Right hand index finger centered on key "SHIFT" with index pinch down')
     hand_a = hand_over_key(controller, "A")
     update_shift_a = controller.update(
         hands=(hand_a,),
@@ -61,8 +61,8 @@ def run() -> object:
         frame_height=FRAME_HEIGHT,
         now=2.0,
     )
-    suite.check_equal("shifted letter uses hotkey action", update_shift_a.actions[0], Hotkey(("shift", "a")))
-    suite.check_false("one-shot shift resets after the letter press", controller.state.shift_one_shot)
+    suite.check_equal("shifted letter uses hotkey action", update_shift_a.actions[0], Hotkey(("shift", "a")), input_data='After SHIFT is armed, Right hand index finger is centered on key "A" with index pinch down')
+    suite.check_false("one-shot shift resets after the letter press", controller.state.shift_one_shot, input_data='State of controller after shifted letter "A" is pressed once')
 
     controller = KeyboardController()
     caps_hand = hand_over_key(controller, "CAPS")
@@ -81,7 +81,7 @@ def run() -> object:
         frame_height=FRAME_HEIGHT,
         now=2.0,
     )
-    suite.check_equal("caps lock keeps uppercase behavior", update_caps_a.actions[0], Hotkey(("shift", "a")))
+    suite.check_equal("caps lock keeps uppercase behavior", update_caps_a.actions[0], Hotkey(("shift", "a")), input_data='After CAPS is toggled, Right hand index finger is centered on key "A" with index pinch down')
 
     controller = KeyboardController()
     page_symbols_hand = hand_over_key(controller, "PAGE_SYMBOLS")
@@ -92,7 +92,7 @@ def run() -> object:
         frame_height=FRAME_HEIGHT,
         now=1.0,
     )
-    suite.check_equal("page switch changes controller state to symbols", update_page.page, "symbols")
+    suite.check_equal("page switch changes controller state to symbols", update_page.page, "symbols", input_data='Right hand index finger centered on key "PAGE_SYMBOLS" with index pinch down')
     hand_one = hand_over_key(controller, "1")
     update_one = controller.update(
         hands=(hand_one,),
@@ -101,7 +101,7 @@ def run() -> object:
         frame_height=FRAME_HEIGHT,
         now=2.0,
     )
-    suite.check_equal("number key on symbols page types numeric keypress", update_one.actions[0], KeyPress("1"))
+    suite.check_equal("number key on symbols page types numeric keypress", update_one.actions[0], KeyPress("1"), input_data='Symbols page active, Right hand index finger centered on key "1" with index pinch down')
 
     controller = KeyboardController()
     backspace_update = controller.update(
@@ -111,7 +111,7 @@ def run() -> object:
         frame_height=FRAME_HEIGHT,
         now=1.0,
     )
-    suite.check_equal("middle pinch sends backspace", backspace_update.actions[0], KeyPress("backspace"))
+    suite.check_equal("middle pinch sends backspace", backspace_update.actions[0], KeyPress("backspace"), input_data="no hovered key, but pinch_states contains Right.middle.down = True")
 
     return suite.summary()
 

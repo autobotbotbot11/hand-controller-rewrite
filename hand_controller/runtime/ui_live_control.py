@@ -12,6 +12,7 @@ from ..controllers.keyboard_controller import KeyboardUpdate
 from ..gestures import MouseClickGestureState
 from ..ml import MLPrediction, MLPredictor
 from ..runtime.control_engine import LiveControlEngine
+from ..runtime.diagnostics import diagnostics_enabled, diagnostics_log_path, log_diagnostic
 from ..runtime.state import Mode, RuntimeState
 from ..ui.payloads import OverlayKeyRect, OverlayPayload, OverlayPointer
 from ..vision.camera import Camera
@@ -162,6 +163,7 @@ def run_ui_live_worker(
     screen_height: int,
 ) -> None:
     try:
+        log_diagnostic("worker=start")
         engine = LiveControlEngine(config, screen_width=screen_width, screen_height=screen_height)
 
         with Camera(
@@ -239,6 +241,7 @@ def run_ui_live_worker(
             ),
         )
         try:
+            log_diagnostic(f"worker=error detail={exc}")
             overlay_bus.update_overlay.emit(error_payload)
         except Exception:
             pass
@@ -283,9 +286,17 @@ def _start_ui_live_warmup(config: AppConfig) -> None:
 
 
 def run_ui_live_control(config: AppConfig) -> None:
+    log_diagnostic(
+        "ui_live=start "
+        f"tuning={config.tuning_path or 'defaults'} "
+        f"camera={config.camera.width}x{config.camera.height}@{config.camera.index} "
+        f"theme={config.general.theme} "
+        f"log={diagnostics_log_path()}"
+    )
     try:
         import mediapipe  # noqa: F401
     except Exception as exc:
+        log_diagnostic(f"ui_live=mediapipe_import_fail detail={exc}")
         raise RuntimeError(
             "MediaPipe failed to initialize before the Qt UI startup. On this Windows setup, mediapipe must load before PyQt5."
         ) from exc
@@ -294,6 +305,7 @@ def run_ui_live_control(config: AppConfig) -> None:
         from PyQt5.QtWidgets import QApplication
         from ..ui.main_window import MainWindow
     except ModuleNotFoundError as exc:
+        log_diagnostic(f"ui_live=pyqt_import_fail detail={exc}")
         raise RuntimeError(
             "PyQt5 is required for --ui-live. Install requirements.txt first."
         ) from exc
@@ -311,4 +323,7 @@ def run_ui_live_control(config: AppConfig) -> None:
     )
     _start_ui_live_warmup(config)
     window.show()
+    if diagnostics_enabled():
+        log_diagnostic("ui_live=window_shown")
     app.exec_()
+    log_diagnostic("ui_live=exit")

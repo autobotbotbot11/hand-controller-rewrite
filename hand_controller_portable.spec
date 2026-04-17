@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_data_files, copy_metadata
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules, copy_metadata
 
 
 repo_root = Path(SPECPATH).resolve()
@@ -27,6 +27,8 @@ hiddenimports = [
     "sklearn",
     "pyautogui",
 ]
+hiddenimports += collect_submodules("sklearn.neural_network")
+hiddenimports += collect_submodules("sklearn.preprocessing")
 
 
 a = Analysis(
@@ -37,7 +39,7 @@ a = Analysis(
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=[str(repo_root / "pyi_rth_mediapipe_first.py")],
     excludes=[],
     noarchive=False,
     optimize=0,
