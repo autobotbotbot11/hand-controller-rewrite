@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import os
 from pathlib import Path
 import sys
 import threading
@@ -10,10 +11,15 @@ from ..config.settings import RUNTIME_APP_DIR
 
 _LOG_LOCK = threading.Lock()
 _LOG_PATH = RUNTIME_APP_DIR / "HandController.log"
+_MARKER_PATH = RUNTIME_APP_DIR / "HandController.diagnostics"
 
 
 def diagnostics_enabled() -> bool:
-    return bool(getattr(sys, "frozen", False))
+    if not bool(getattr(sys, "frozen", False)):
+        return False
+    if os.environ.get("HANDCONTROLLER_DIAGNOSTICS") == "1":
+        return True
+    return _MARKER_PATH.exists()
 
 
 def diagnostics_log_path() -> Path:

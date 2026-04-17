@@ -24,9 +24,17 @@ if (-not (Test-Path $distDir)) {
 
 $defaultTuning = Join-Path $repoRoot "tuning.testing.json"
 $portableTuning = Join-Path $distDir "tuning.local.json"
+$portableLog = Join-Path $distDir "HandController.log"
+$portableMarker = Join-Path $distDir "HandController.diagnostics"
 if (Test-Path $defaultTuning) {
     Copy-Item $defaultTuning $portableTuning -Force
     Write-Host "Copied tuning.testing.json to dist\HandController\tuning.local.json"
+}
+if (Test-Path $portableLog) {
+    Remove-Item $portableLog -Force
+}
+if (Test-Path $portableMarker) {
+    Remove-Item $portableMarker -Force
 }
 
 Write-Host ""

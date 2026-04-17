@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules, copy_metadata
+from PyInstaller.utils.hooks import collect_data_files, copy_metadata
 
 
 repo_root = Path(SPECPATH).resolve()
@@ -26,9 +26,13 @@ hiddenimports = [
     "joblib",
     "sklearn",
     "pyautogui",
+    "sklearn.neural_network",
+    "sklearn.neural_network._multilayer_perceptron",
+    "sklearn.neural_network._stochastic_optimizers",
+    "sklearn.preprocessing",
+    "sklearn.preprocessing._data",
+    "sklearn.preprocessing._label",
 ]
-hiddenimports += collect_submodules("sklearn.neural_network")
-hiddenimports += collect_submodules("sklearn.preprocessing")
 
 
 a = Analysis(
