@@ -3,13 +3,35 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field, fields, replace
 import json
 from pathlib import Path
+import sys
 from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_TUNING_PATH = REPO_ROOT / "tuning.local.json"
-DEFAULT_ARTIFACTS_DIR = REPO_ROOT / "artifacts"
-DEFAULT_FALLBACK_ARTIFACTS_DIR = REPO_ROOT.parent / "touch-v15" / "hand_controller" / "artifacts"
+
+
+def _runtime_bundle_root() -> Path:
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        return Path(meipass).resolve()
+    return REPO_ROOT
+
+
+def _runtime_app_dir() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return REPO_ROOT
+
+
+RUNTIME_BUNDLE_ROOT = _runtime_bundle_root()
+RUNTIME_APP_DIR = _runtime_app_dir()
+DEFAULT_TUNING_PATH = RUNTIME_APP_DIR / "tuning.local.json"
+DEFAULT_ARTIFACTS_DIR = RUNTIME_BUNDLE_ROOT / "artifacts"
+DEFAULT_FALLBACK_ARTIFACTS_DIR = (
+    REPO_ROOT.parent / "touch-v15" / "hand_controller" / "artifacts"
+    if not getattr(sys, "frozen", False)
+    else DEFAULT_ARTIFACTS_DIR
+)
 
 
 @dataclass(slots=True, frozen=True)

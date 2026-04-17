@@ -162,6 +162,7 @@ Repo-local source of truth:
 - `docs/gesture-spec.md`
 - `docs/architecture.md`
 - `docs/phase-plan.md`
+- `docs/packaging-portable.md`
 - `docs/keyboard-v1-design.md`
 - `docs/keyboard-v1-implementation-plan.md`
 - `docs/group-testing.md`
@@ -194,6 +195,8 @@ Tester-friendly repo entrypoints:
 - `tuning.testing.json`
 - `setup-tester.ps1`
 - `run-tester.ps1`
+- `build-portable.ps1`
+- `hand_controller_portable.spec`
 - `docs/group-testing.md`
 
 Smoke tests already passed:

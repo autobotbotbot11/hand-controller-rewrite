@@ -9,6 +9,8 @@ from .settings import (
     MLConfig,
     MouseClickConfig,
     MouseMotionConfig,
+    RUNTIME_APP_DIR,
+    RUNTIME_BUNDLE_ROOT,
     build_default_config,
     tuning_snapshot,
 )
@@ -24,6 +26,8 @@ __all__ = [
     "MLConfig",
     "MouseClickConfig",
     "MouseMotionConfig",
+    "RUNTIME_APP_DIR",
+    "RUNTIME_BUNDLE_ROOT",
     "build_default_config",
     "tuning_snapshot",
 ]

@@ -30,7 +30,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ..config.settings import AppConfig, build_factory_default_config
+from ..config.settings import AppConfig, RUNTIME_APP_DIR, RUNTIME_BUNDLE_ROOT, build_factory_default_config
 from ..vision.camera import CameraSource, detect_available_cameras, probe_camera_index
 from .overlay_window import OverlayWindow
 from .signals import OverlaySignalBus
@@ -1176,10 +1176,12 @@ class MainWindow(QMainWindow):
     def _build_logo_widget(self) -> QLabel:
         label = QLabel()
         candidates = [
-            Path(__file__).resolve().parents[2] / "assets" / "touch-logo.png",
-            Path(__file__).resolve().parents[2] / "assets" / "logo.png",
-            Path(__file__).resolve().parents[2] / "touch-logo.png",
-            Path(__file__).resolve().parents[2] / "logo.png",
+            RUNTIME_BUNDLE_ROOT / "assets" / "touch-logo.png",
+            RUNTIME_BUNDLE_ROOT / "assets" / "logo.png",
+            RUNTIME_APP_DIR / "assets" / "touch-logo.png",
+            RUNTIME_APP_DIR / "assets" / "logo.png",
+            RUNTIME_APP_DIR / "touch-logo.png",
+            RUNTIME_APP_DIR / "logo.png",
         ]
         logo_path = next((path for path in candidates if path.exists()), None)
         if logo_path is not None:

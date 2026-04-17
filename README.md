@@ -105,3 +105,4 @@ python -m hand_controller --validate
 - [handoff.md](/C:/Users/acer/school/self-study/programming/projects/computer-vision-mouse-control/hand-controller-rewrite/docs/handoff.md)
 - [architecture.md](/C:/Users/acer/school/self-study/programming/projects/computer-vision-mouse-control/hand-controller-rewrite/docs/architecture.md)
 - [gesture-spec.md](/C:/Users/acer/school/self-study/programming/projects/computer-vision-mouse-control/hand-controller-rewrite/docs/gesture-spec.md)
+- [packaging-portable.md](/C:/Users/acer/school/self-study/programming/projects/computer-vision-mouse-control/hand-controller-rewrite/docs/packaging-portable.md)

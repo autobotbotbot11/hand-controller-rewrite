@@ -4,7 +4,7 @@ import importlib
 import json
 from pathlib import Path
 
-from ..config.settings import AppConfig, REPO_ROOT
+from ..config.settings import AppConfig, REPO_ROOT, RUNTIME_BUNDLE_ROOT
 from ..ml import MLPredictor
 
 
@@ -22,11 +22,12 @@ def _format_status(name: str, ok: bool, detail: str) -> str:
 
 def run_validation(config: AppConfig) -> None:
     repo_root = REPO_ROOT
-    local_artifacts_dir = repo_root / "artifacts"
+    local_artifacts_dir = RUNTIME_BUNDLE_ROOT / "artifacts"
 
     lines: list[str] = [
         "Hand Controller Rewrite Validation",
         f"repo_root={repo_root}",
+        f"runtime_bundle_root={RUNTIME_BUNDLE_ROOT}",
         f"tuning={config.tuning_path or 'defaults'}",
         f"local_artifacts_dir={local_artifacts_dir}",
     ]
