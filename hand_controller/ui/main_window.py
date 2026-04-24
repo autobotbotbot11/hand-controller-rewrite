@@ -1791,6 +1791,56 @@ class MainWindow(QMainWindow):
             )
         )
 
+    def _set_combo_by_data(self, key: str, value: object) -> None:
+        control = self.controls.get(key)
+        if not isinstance(control, QComboBox):
+            return
+        self._block(key, True)
+        try:
+            idx = control.findData(value)
+            if idx >= 0:
+                control.setCurrentIndex(idx)
+        finally:
+            self._block(key, False)
+
+    def _set_selfie_size_slider_from_width(self, width_px: int) -> None:
+        control = self.controls.get("selfie_size")
+        if not isinstance(control, QSlider):
+            return
+        value = max(50, min(160, int(round((width_px / 320.0) * 100))))
+        self._block("selfie_size", True)
+        try:
+            control.setValue(value)
+            self.value_labels["selfie"].setText(f"{value}%")
+        finally:
+            self._block("selfie_size", False)
+
+    @pyqtSlot()
+    def _selfie_hide_requested(self) -> None:
+        self._update_keyboard(show_selfie=False)
+        self._set_checked_control("show_live_selfie", False)
+
+    @pyqtSlot(int, int, float, float)
+    def _selfie_size_changed(self, width_px: int, height_px: int, x_ratio: float, y_ratio: float) -> None:
+        self._update_keyboard(
+            selfie_width_px=int(width_px),
+            selfie_height_px=int(height_px),
+            selfie_position="custom",
+            selfie_custom_x_ratio=float(x_ratio),
+            selfie_custom_y_ratio=float(y_ratio),
+        )
+        self._set_combo_by_data("selfie_position", "custom")
+        self._set_selfie_size_slider_from_width(width_px)
+        self._persist_keyboard_fields(
+            (
+                "selfie_width_px",
+                "selfie_height_px",
+                "selfie_position",
+                "selfie_custom_x_ratio",
+                "selfie_custom_y_ratio",
+            )
+        )
+
     def _set_checked_control(self, key: str, checked: bool) -> None:
         control = self.controls.get(key)
         if not isinstance(control, QCheckBox):
@@ -1945,6 +1995,8 @@ class MainWindow(QMainWindow):
         if self.selfie_window is None:
             self.selfie_window = SelfieWindow(settings)
             self.selfie_window.position_changed.connect(self._selfie_position_dragged)
+            self.selfie_window.hide_requested.connect(self._selfie_hide_requested)
+            self.selfie_window.size_changed.connect(self._selfie_size_changed)
         else:
             self.selfie_window.apply_settings(settings)
 
