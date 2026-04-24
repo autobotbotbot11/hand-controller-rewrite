@@ -10,6 +10,7 @@ Build a **portable Windows app folder**:
 - user runs `HandController.exe`
 
 This is intentionally **not** an installer-first flow.
+The portable build remains the base packaging layer even now that a preview installer path exists.
 
 ## Current packaging style
 
@@ -85,8 +86,7 @@ This was intentionally kept narrow so packaging does not distort the app's core 
 
 - Windows only
 - still a trial packaging flow
-- no installer yet
-- no app icon `.ico` yet
+- installer path now exists separately in `docs/packaging-installer.md`
 - no final code-signing or antivirus false-positive hardening yet
 
 ## Recommended release ladder
@@ -94,4 +94,4 @@ This was intentionally kept narrow so packaging does not distort the app's core 
 1. trial portable build
 2. test on the developer machine
 3. test on another Windows machine without Python
-4. only after stable: consider an installer
+4. only after stable: consider installer polish and release hardening

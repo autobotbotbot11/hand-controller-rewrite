@@ -117,3 +117,5 @@ Recent hardening already added after the original phase sequence:
 - async launch preflight
 - launch-time overlay placeholder
 - targeted startup prewarm for ML and MediaPipe
+- portable Windows packaging
+- preview installer packaging

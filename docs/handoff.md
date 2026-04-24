@@ -163,6 +163,7 @@ Repo-local source of truth:
 - `docs/architecture.md`
 - `docs/phase-plan.md`
 - `docs/packaging-portable.md`
+- `docs/packaging-installer.md`
 - `docs/keyboard-v1-design.md`
 - `docs/keyboard-v1-implementation-plan.md`
 - `docs/group-testing.md`
@@ -196,7 +197,9 @@ Tester-friendly repo entrypoints:
 - `setup-tester.ps1`
 - `run-tester.ps1`
 - `build-portable.ps1`
+- `build-installer.ps1`
 - `hand_controller_portable.spec`
+- `hand_controller_installer.iss`
 - `docs/group-testing.md`
 
 Smoke tests already passed:
@@ -221,8 +224,9 @@ Recommended next work, in order:
    - run `.\run-tester.ps1`
    - collect feedback using `docs/group-testing.md`
 2. packaging / actual app distribution planning
-   - portable packaged Windows app first
-   - installer only after the portable build is stable
+   - portable packaged Windows app is already in place
+   - preview installer path now exists on top of the portable build
+   - next packaging work should focus on release polish, not first-time setup
 3. remaining UX edge cases only if testers surface them
    - keyboard feel
    - camera switching edge cases
