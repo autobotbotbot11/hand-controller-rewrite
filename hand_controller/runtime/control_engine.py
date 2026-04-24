@@ -10,7 +10,7 @@ from ..controllers import (
     MouseController,
     execute_actions,
 )
-from ..controllers.actions import Action, Click, Hotkey, KeyPress, MouseDown, MouseUp
+from ..controllers.actions import Action, Click, DoubleClick, Hotkey, KeyPress, MouseDown, MouseUp
 from ..controllers.keyboard_controller import KeyboardUpdate
 from ..gestures import (
     HandPinchDetector,
@@ -34,6 +34,15 @@ MOVEMENT_ANCHOR_IDX = 5
 def _movement_anchor_norm(hand) -> tuple[float, float]:
     point = hand.landmark(MOVEMENT_ANCHOR_IDX)
     return point.x, point.y
+
+
+def _hovered_keyboard_label(keyboard_update: KeyboardUpdate, hand_label: str | None) -> str | None:
+    if hand_label is None:
+        return None
+    for label, hovered in keyboard_update.hovered_key_by_hand:
+        if label == hand_label:
+            return hovered
+    return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -331,7 +340,6 @@ class LiveControlEngine:
                 or (click_state.left_pressed and not self.mouse_controller.state.drag_active)
             )
         else:
-            self.click_detector.reset()
             self.runtime_state.movement_frozen = True
 
             if self.runtime_state.control_enabled and self.config.keyboard.virtual_keyboard_enabled:
@@ -350,18 +358,65 @@ class LiveControlEngine:
                     status="keyboard disabled" if not self.config.keyboard.virtual_keyboard_enabled else "keyboard control off",
                 )
 
+            active_keyboard_hover = _hovered_keyboard_label(
+                keyboard_update,
+                active_hand.label if active_hand is not None else None,
+            )
+            keyboard_hybrid_enabled = (
+                self.runtime_state.control_enabled
+                and self.config.keyboard.virtual_keyboard_enabled
+                and active_hand is not None
+            )
+            keyboard_mouse_movement_allowed = (
+                keyboard_hybrid_enabled
+                and ml_update.stable_label == ML_LABEL_HOLD
+            )
+            keyboard_mouse_click_enabled = (
+                keyboard_hybrid_enabled
+                and active_keyboard_hover is None
+                and not keyboard_mouse_movement_allowed
+            )
+
+            if keyboard_mouse_click_enabled:
+                click_state = self.click_detector.analyze(
+                    active_hand=active_hand,
+                    frame_width=vision.frame_width,
+                    frame_height=vision.frame_height,
+                    activation_allowed=press_gestures_safe,
+                )
+            else:
+                self.click_detector.reset()
+
+            anchor_norm = (
+                _movement_anchor_norm(active_hand)
+                if active_hand is not None and (keyboard_mouse_movement_allowed or keyboard_mouse_click_enabled)
+                else None
+            )
             mouse_actions, mouse_status = self.mouse_controller.update(
-                anchor_norm=None,
+                anchor_norm=anchor_norm,
                 control_enabled=self.runtime_state.control_enabled,
-                movement_allowed=False,
-                click_enabled=False,
-                press_activation_allowed=False,
-                right_click_allowed=False,
-                click_state=MouseClickGestureState(),
+                movement_allowed=keyboard_mouse_movement_allowed,
+                click_enabled=keyboard_mouse_click_enabled,
+                press_activation_allowed=press_gestures_safe,
+                right_click_allowed=True,
+                click_state=click_state,
                 now=now,
             )
             action_queue.extend(mouse_actions)
-            movement_status = transition_status or ("keyboard mode" if mouse_status == "Mouse | no active hand" else mouse_status)
+            feedback_actions.extend(mouse_actions)
+            movement_enabled = keyboard_mouse_movement_allowed
+            self.runtime_state.movement_frozen = not movement_enabled
+            click_feedback_status = mouse_status
+            click_freeze = keyboard_mouse_click_enabled and (
+                click_state.right_pressed
+                or (click_state.left_pressed and not self.mouse_controller.state.drag_active)
+            )
+            if transition_status is not None:
+                movement_status = transition_status
+            elif keyboard_mouse_movement_allowed or mouse_actions:
+                movement_status = f"keyboard hybrid | {mouse_status}"
+            else:
+                movement_status = "keyboard mode"
 
         execute_actions(action_queue)
 

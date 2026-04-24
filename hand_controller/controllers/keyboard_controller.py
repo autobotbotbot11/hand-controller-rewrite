@@ -372,10 +372,6 @@ class KeyboardController:
         pointers: list[KeyboardPointer] = []
         hovered_by_hand: dict[str, str | None] = {"Left": None, "Right": None}
 
-        for pinch_state in pinch_states.values():
-            if pinch_state.middle.down:
-                actions.append(KeyPress("backspace"))
-
         for hand in hands:
             hand_label = hand.label
             thumb_x, thumb_y = _landmark_px(hand, THUMB_TIP_IDX, frame_width, frame_height)
@@ -401,7 +397,12 @@ class KeyboardController:
             hovered_by_hand[hand_label] = key.label
             highlights.add(key.label)
             pinch_state = pinch_states.get(hand_label)
-            if pinch_state is None or not pinch_state.index.down:
+            if pinch_state is None:
+                continue
+            if pinch_state.middle.down:
+                actions.append(KeyPress("backspace"))
+                continue
+            if not pinch_state.index.down:
                 continue
             if (now - self.state.last_tap_at) < self.settings.tap_cooldown_seconds:
                 continue
