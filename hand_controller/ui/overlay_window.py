@@ -57,10 +57,17 @@ class OverlayWindow(QWidget):
 
     def _draw_keyboard(self, painter: QPainter) -> None:
         painter.setFont(QFont("Arial", self.settings.key_label_font_px))
+        dimmed = self.payload.keyboard_dimmed
         for key in self.payload.keyboard_keys:
             highlighted = key.label in self.payload.highlight_labels
-            fill = QColor(0, 0, 0, 155) if not highlighted else QColor(0, 120, 220, 185)
-            border = QColor(255, 255, 255, 210) if highlighted else QColor(185, 185, 185, 180)
+            if dimmed:
+                fill = QColor(0, 0, 0, 70) if not highlighted else QColor(0, 120, 220, 95)
+                border = QColor(255, 255, 255, 105) if highlighted else QColor(185, 185, 185, 75)
+                text = QColor(255, 255, 255, 120)
+            else:
+                fill = QColor(0, 0, 0, 155) if not highlighted else QColor(0, 120, 220, 185)
+                border = QColor(255, 255, 255, 210) if highlighted else QColor(185, 185, 185, 180)
+                text = QColor(255, 255, 255, 230)
 
             painter.setBrush(QBrush(fill))
             painter.setPen(QPen(border, self.settings.key_border_px if not highlighted else self.settings.key_hover_border_px))
@@ -68,7 +75,7 @@ class OverlayWindow(QWidget):
             painter.drawRect(rect)
 
             label = "SPC" if key.label == "SPACE" else key.label
-            painter.setPen(QColor(255, 255, 255, 230))
+            painter.setPen(text)
             painter.drawText(rect, Qt.AlignCenter, label)
 
     def _draw_skeleton(self, painter: QPainter) -> None:

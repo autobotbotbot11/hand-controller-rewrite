@@ -28,6 +28,7 @@ class OverlayPayload:
     mode: str = "mouse"
     control_enabled: bool = True
     keyboard_visible: bool = False
+    keyboard_dimmed: bool = False
     keyboard_keys: tuple[OverlayKeyRect, ...] = ()
     highlight_labels: frozenset[str] = frozenset()
     finger_points: tuple[OverlayPointer, ...] = ()

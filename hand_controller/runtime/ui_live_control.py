@@ -137,6 +137,7 @@ def _build_overlay_payload(
     skeleton_lines: tuple[tuple[int, int, int, int], ...],
     selfie_frame,
     mouse_status: str,
+    movement_enabled: bool,
     gesture_command_text: str,
     debug_tags: tuple[str, ...],
 ) -> OverlayPayload:
@@ -145,6 +146,7 @@ def _build_overlay_payload(
         mode=runtime_state.mode.value,
         control_enabled=runtime_state.control_enabled,
         keyboard_visible=keyboard_visible,
+        keyboard_dimmed=keyboard_visible and movement_enabled,
         keyboard_keys=_build_keyboard_keys(keyboard_update) if keyboard_visible else (),
         highlight_labels=keyboard_update.highlight_labels if keyboard_visible else frozenset(),
         finger_points=_build_pointer_payload(keyboard_update) if keyboard_visible else (),
@@ -209,6 +211,7 @@ def run_ui_live_worker(
                         height=config.keyboard.selfie_height_px,
                     ),
                     mouse_status=frame_result.movement_status,
+                    movement_enabled=frame_result.movement_enabled,
                     gesture_command_text=frame_result.gesture_command_text,
                     debug_tags=_build_debug_tags(
                         selected=frame_result.selected,
