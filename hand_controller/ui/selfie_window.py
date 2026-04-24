@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from PyQt5.QtCore import QPoint, QRect, QRectF, Qt, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QBrush, QColor, QImage, QMouseEvent, QPainter, QPainterPath, QPen
 from PyQt5.QtWidgets import QApplication, QWidget
@@ -24,7 +26,7 @@ class SelfieWindow(QWidget):
         self.settings = settings or KeyboardConfig()
         self.payload = OverlayPayload()
         self._drag_offset: QPoint | None = None
-        self._resizing = False
+        self._resize_corner: Literal["top_left", "top_right", "bottom_left", "bottom_right"] | None = None
         self._hovered = False
         self._init_ui()
         self._apply_geometry_from_settings()
@@ -120,37 +122,105 @@ class SelfieWindow(QWidget):
 
     def _close_rect(self) -> QRect:
         margin = 8
-        return QRect(self.width() - self.CLOSE_SIZE - margin, margin, self.CLOSE_SIZE, self.CLOSE_SIZE)
+        return QRect((self.width() - self.CLOSE_SIZE) // 2, margin, self.CLOSE_SIZE, self.CLOSE_SIZE)
 
-    def _resize_rect(self) -> QRect:
-        return QRect(self.width() - self.RESIZE_SIZE, self.height() - self.RESIZE_SIZE, self.RESIZE_SIZE, self.RESIZE_SIZE)
+    def _resize_rects(self) -> dict[str, QRect]:
+        size = self.RESIZE_SIZE
+        return {
+            "top_left": QRect(0, 0, size, size),
+            "top_right": QRect(self.width() - size, 0, size, size),
+            "bottom_left": QRect(0, self.height() - size, size, size),
+            "bottom_right": QRect(self.width() - size, self.height() - size, size, size),
+        }
+
+    def _resize_corner_at(self, pos: QPoint) -> Literal["top_left", "top_right", "bottom_left", "bottom_right"] | None:
+        for corner, rect in self._resize_rects().items():
+            if rect.contains(pos):
+                return corner  # type: ignore[return-value]
+        return None
 
     def _update_cursor(self, pos: QPoint) -> None:
-        if self._resizing:
-            self.setCursor(Qt.SizeFDiagCursor)
+        corner = self._resize_corner_at(pos)
+        if self._resize_corner is not None:
+            if self._resize_corner in {"top_left", "bottom_right"}:
+                self.setCursor(Qt.SizeFDiagCursor)
+            else:
+                self.setCursor(Qt.SizeBDiagCursor)
         elif self._drag_offset is not None:
             self.setCursor(Qt.ClosedHandCursor)
-        elif self._resize_rect().contains(pos):
+        elif corner in {"top_left", "bottom_right"}:
             self.setCursor(Qt.SizeFDiagCursor)
+        elif corner in {"top_right", "bottom_left"}:
+            self.setCursor(Qt.SizeBDiagCursor)
         elif self._close_rect().contains(pos):
             self.setCursor(Qt.PointingHandCursor)
         else:
             self.setCursor(Qt.OpenHandCursor)
 
     def _resize_from_global_pos(self, global_pos: QPoint) -> None:
+        if self._resize_corner is None:
+            return
         available = self._available_geometry()
-        top_left = self.frameGeometry().topLeft()
-        available_width = available.right() - top_left.x() + 1
-        available_height = available.bottom() - top_left.y() + 1
-        max_width = int(min(self.MAX_WIDTH, available_width, available_height * self.ASPECT_RATIO))
-        min_width = min(self.MIN_WIDTH, max_width)
-        raw_width = max(
-            global_pos.x() - top_left.x(),
-            int(round((global_pos.y() - top_left.y()) * self.ASPECT_RATIO)),
-        )
-        width = max(min_width, min(max_width, raw_width))
-        height = int(round(width / self.ASPECT_RATIO))
-        self.resize(width, height)
+        frame = self.frameGeometry()
+        max_width = self.MAX_WIDTH
+        width = self.width()
+        height = self.height()
+        top_left = frame.topLeft()
+
+        if self._resize_corner == "bottom_right":
+            anchor = frame.topLeft()
+            raw_width = max(
+                global_pos.x() - anchor.x(),
+                int(round((global_pos.y() - anchor.y()) * self.ASPECT_RATIO)),
+            )
+            available_width = available.right() - anchor.x() + 1
+            available_height = available.bottom() - anchor.y() + 1
+            max_width = int(min(self.MAX_WIDTH, available_width, available_height * self.ASPECT_RATIO))
+            min_width = min(self.MIN_WIDTH, max_width)
+            width = max(min_width, min(max_width, raw_width))
+            height = int(round(width / self.ASPECT_RATIO))
+            top_left = anchor
+        elif self._resize_corner == "bottom_left":
+            anchor = frame.topRight()
+            raw_width = max(
+                anchor.x() - global_pos.x() + 1,
+                int(round((global_pos.y() - anchor.y()) * self.ASPECT_RATIO)),
+            )
+            available_width = anchor.x() - available.left() + 1
+            available_height = available.bottom() - anchor.y() + 1
+            max_width = int(min(self.MAX_WIDTH, available_width, available_height * self.ASPECT_RATIO))
+            min_width = min(self.MIN_WIDTH, max_width)
+            width = max(min_width, min(max_width, raw_width))
+            height = int(round(width / self.ASPECT_RATIO))
+            top_left = QPoint(anchor.x() - width + 1, anchor.y())
+        elif self._resize_corner == "top_right":
+            anchor = frame.bottomLeft()
+            raw_width = max(
+                global_pos.x() - anchor.x(),
+                int(round((anchor.y() - global_pos.y() + 1) * self.ASPECT_RATIO)),
+            )
+            available_width = available.right() - anchor.x() + 1
+            available_height = anchor.y() - available.top() + 1
+            max_width = int(min(self.MAX_WIDTH, available_width, available_height * self.ASPECT_RATIO))
+            min_width = min(self.MIN_WIDTH, max_width)
+            width = max(min_width, min(max_width, raw_width))
+            height = int(round(width / self.ASPECT_RATIO))
+            top_left = QPoint(anchor.x(), anchor.y() - height + 1)
+        else:
+            anchor = frame.bottomRight()
+            raw_width = max(
+                anchor.x() - global_pos.x() + 1,
+                int(round((anchor.y() - global_pos.y() + 1) * self.ASPECT_RATIO)),
+            )
+            available_width = anchor.x() - available.left() + 1
+            available_height = anchor.y() - available.top() + 1
+            max_width = int(min(self.MAX_WIDTH, available_width, available_height * self.ASPECT_RATIO))
+            min_width = min(self.MIN_WIDTH, max_width)
+            width = max(min_width, min(max_width, raw_width))
+            height = int(round(width / self.ASPECT_RATIO))
+            top_left = QPoint(anchor.x() - width + 1, anchor.y() - height + 1)
+
+        self.setGeometry(QRect(top_left, QRect(0, 0, width, height).size()))
         self.update()
 
     @pyqtSlot(object)
@@ -178,9 +248,10 @@ class SelfieWindow(QWidget):
             self.hide_requested.emit()
             event.accept()
             return
-        if self._resize_rect().contains(event.pos()):
-            self._resizing = True
-            self.setCursor(Qt.SizeFDiagCursor)
+        resize_corner = self._resize_corner_at(event.pos())
+        if resize_corner is not None:
+            self._resize_corner = resize_corner
+            self._update_cursor(event.pos())
             event.accept()
             return
         self._drag_offset = event.globalPos() - self.frameGeometry().topLeft()
@@ -188,7 +259,7 @@ class SelfieWindow(QWidget):
         event.accept()
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:  # noqa: N802
-        if self._resizing:
+        if self._resize_corner is not None:
             self._resize_from_global_pos(event.globalPos())
             event.accept()
             return
@@ -200,8 +271,8 @@ class SelfieWindow(QWidget):
         event.accept()
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:  # noqa: N802
-        if event.button() == Qt.LeftButton and self._resizing:
-            self._resizing = False
+        if event.button() == Qt.LeftButton and self._resize_corner is not None:
+            self._resize_corner = None
             self._update_cursor(event.pos())
             x_ratio, y_ratio = self._current_position_ratio()
             self.size_changed.emit(self.width(), self.height(), x_ratio, y_ratio)
@@ -222,7 +293,7 @@ class SelfieWindow(QWidget):
 
     def leaveEvent(self, event) -> None:  # noqa: N802
         self._hovered = False
-        if not self._resizing and self._drag_offset is None:
+        if self._resize_corner is None and self._drag_offset is None:
             self.setCursor(Qt.OpenHandCursor)
         self.update()
         super().leaveEvent(event)
@@ -260,7 +331,7 @@ class SelfieWindow(QWidget):
         else:
             self._draw_placeholder(painter, target)
 
-        if self._hovered or self._resizing or self._drag_offset is not None:
+        if self._hovered or self._resize_corner is not None or self._drag_offset is not None:
             self._draw_hover_controls(painter)
 
     def _draw_placeholder(self, painter: QPainter, target: QRect) -> None:
@@ -294,23 +365,53 @@ class SelfieWindow(QWidget):
     def _draw_hover_controls(self, painter: QPainter) -> None:
         painter.save()
 
-        close_rect = QRectF(self._close_rect())
+        hide_rect = QRectF(self._close_rect())
         painter.setPen(QPen(QColor(255, 255, 255, 185), 1))
         painter.setBrush(QBrush(QColor(0, 0, 0, 150)))
-        painter.drawEllipse(close_rect)
-        painter.setPen(QPen(QColor(255, 255, 255, 230), 2, Qt.SolidLine, Qt.RoundCap))
-        cx = close_rect.center().x()
-        cy = close_rect.center().y()
-        painter.drawLine(QPoint(int(cx - 5), int(cy - 5)), QPoint(int(cx + 5), int(cy + 5)))
-        painter.drawLine(QPoint(int(cx + 5), int(cy - 5)), QPoint(int(cx - 5), int(cy + 5)))
+        painter.drawEllipse(hide_rect)
 
-        painter.setPen(QPen(QColor(255, 255, 255, 185), 2, Qt.SolidLine, Qt.RoundCap))
-        right = self.width() - 9
-        bottom = self.height() - 9
-        for offset in (0, 6, 12):
-            painter.drawLine(
-                QPoint(right - offset - 10, bottom),
-                QPoint(right, bottom - offset - 10),
-            )
+        cx = hide_rect.center().x()
+        cy = hide_rect.center().y()
+        eye = QRectF(cx - 7, cy - 4, 14, 8)
+        painter.setPen(QPen(QColor(255, 255, 255, 225), 1.6, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+        painter.setBrush(Qt.NoBrush)
+        painter.drawEllipse(eye)
+        painter.drawEllipse(QPoint(int(cx), int(cy)), 2, 2)
+        painter.setPen(QPen(QColor(255, 255, 255, 235), 2, Qt.SolidLine, Qt.RoundCap))
+        painter.drawLine(QPoint(int(cx - 8), int(cy + 8)), QPoint(int(cx + 8), int(cy - 8)))
+
+        painter.setPen(QPen(QColor(255, 255, 255, 180), 2, Qt.SolidLine, Qt.RoundCap))
+        self._draw_corner_grip(painter, "top_left")
+        self._draw_corner_grip(painter, "top_right")
+        self._draw_corner_grip(painter, "bottom_left")
+        self._draw_corner_grip(painter, "bottom_right")
 
         painter.restore()
+
+    def _draw_corner_grip(self, painter: QPainter, corner: str) -> None:
+        margin = 9
+        lengths = (8, 14)
+        if corner == "top_left":
+            x = margin
+            y = margin
+            for length in lengths:
+                painter.drawLine(QPoint(x, y + length), QPoint(x, y))
+                painter.drawLine(QPoint(x, y), QPoint(x + length, y))
+        elif corner == "top_right":
+            x = self.width() - margin
+            y = margin
+            for length in lengths:
+                painter.drawLine(QPoint(x - length, y), QPoint(x, y))
+                painter.drawLine(QPoint(x, y), QPoint(x, y + length))
+        elif corner == "bottom_left":
+            x = margin
+            y = self.height() - margin
+            for length in lengths:
+                painter.drawLine(QPoint(x, y - length), QPoint(x, y))
+                painter.drawLine(QPoint(x, y), QPoint(x + length, y))
+        else:
+            x = self.width() - margin
+            y = self.height() - margin
+            for length in lengths:
+                painter.drawLine(QPoint(x - length, y), QPoint(x, y))
+                painter.drawLine(QPoint(x, y), QPoint(x, y - length))
