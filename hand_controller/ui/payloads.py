@@ -17,6 +17,10 @@ class OverlayPointer:
     x: int
     y: int
     hand_label: str = ""
+    thumb_x: int | None = None
+    thumb_y: int | None = None
+    index_x: int | None = None
+    index_y: int | None = None
 
 
 @dataclass(frozen=True, slots=True)

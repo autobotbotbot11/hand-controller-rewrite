@@ -79,15 +79,23 @@ class OverlayWindow(QWidget):
 
     def _draw_pointers(self, painter: QPainter) -> None:
         radius = self.settings.pointer_radius_px
-        painter.setPen(QPen(QColor(0, 255, 255, 230), self.settings.pointer_stroke_px))
-        painter.setBrush(QBrush(QColor(0, 255, 255, 90)))
         painter.setFont(QFont("Arial", self.settings.pointer_label_font_px, QFont.Bold))
         for pointer in self.payload.finger_points:
+            if (
+                pointer.thumb_x is not None
+                and pointer.thumb_y is not None
+                and pointer.index_x is not None
+                and pointer.index_y is not None
+            ):
+                painter.setPen(QPen(QColor(255, 255, 255, 185), 1))
+                painter.drawLine(pointer.thumb_x, pointer.thumb_y, pointer.index_x, pointer.index_y)
+
+            painter.setPen(QPen(QColor(0, 255, 255, 235), self.settings.pointer_stroke_px))
+            painter.setBrush(QBrush(QColor(0, 255, 255, 155)))
             painter.drawEllipse(pointer.x - radius, pointer.y - radius, radius * 2, radius * 2)
             if pointer.hand_label:
                 painter.setPen(QColor(255, 255, 255, 230))
                 painter.drawText(pointer.x + radius + 3, pointer.y - max(4, radius // 2), pointer.hand_label)
-                painter.setPen(QPen(QColor(0, 255, 255, 230), self.settings.pointer_stroke_px))
 
     def _selfie_target_rect(self) -> QRect:
         margin = 20

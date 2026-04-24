@@ -56,6 +56,20 @@ def _draw_keyboard_overlay(frame_bgr, *, keyboard_update: KeyboardUpdate, contro
         )
 
     for pointer in keyboard_update.pointers:
+        if (
+            pointer.thumb_x is not None
+            and pointer.thumb_y is not None
+            and pointer.index_x is not None
+            and pointer.index_y is not None
+        ):
+            cv2.line(
+                frame_bgr,
+                (pointer.thumb_x, pointer.thumb_y),
+                (pointer.index_x, pointer.index_y),
+                (255, 255, 255),
+                1,
+                cv2.LINE_AA,
+            )
         cv2.circle(frame_bgr, (pointer.x, pointer.y), 12, (80, 255, 80), 2)
         cv2.putText(
             frame_bgr,

@@ -10,6 +10,7 @@ from ..vision.models import DetectedHand
 from .actions import Action, Hotkey, KeyPress
 
 
+THUMB_TIP_IDX = 4
 INDEX_TIP_IDX = 8
 PAGE_ALPHA = "alpha"
 PAGE_SYMBOLS = "symbols"
@@ -41,6 +42,10 @@ class KeyboardPointer:
     x: int
     y: int
     hand_label: str
+    thumb_x: int | None = None
+    thumb_y: int | None = None
+    index_x: int | None = None
+    index_y: int | None = None
 
 
 @dataclass(slots=True)
@@ -270,6 +275,11 @@ def get_key_at_point(keys: tuple[KeyboardKeyRect, ...], x: int, y: int) -> Keybo
     return None
 
 
+def _landmark_px(hand: DetectedHand, index: int, frame_width: int, frame_height: int) -> tuple[int, int]:
+    point = hand.landmark(index)
+    return int(point.x * frame_width), int(point.y * frame_height)
+
+
 class KeyboardController:
     def __init__(self, settings: KeyboardConfig | None = None) -> None:
         self.settings = settings or KeyboardConfig()
@@ -368,10 +378,21 @@ class KeyboardController:
 
         for hand in hands:
             hand_label = hand.label
-            tip = hand.landmark(INDEX_TIP_IDX)
-            px = int(tip.x * frame_width)
-            py = int(tip.y * frame_height)
-            pointers.append(KeyboardPointer(x=px, y=py, hand_label=hand_label))
+            thumb_x, thumb_y = _landmark_px(hand, THUMB_TIP_IDX, frame_width, frame_height)
+            index_x, index_y = _landmark_px(hand, INDEX_TIP_IDX, frame_width, frame_height)
+            px = int(round((thumb_x + index_x) / 2.0))
+            py = int(round((thumb_y + index_y) / 2.0))
+            pointers.append(
+                KeyboardPointer(
+                    x=px,
+                    y=py,
+                    hand_label=hand_label,
+                    thumb_x=thumb_x,
+                    thumb_y=thumb_y,
+                    index_x=index_x,
+                    index_y=index_y,
+                )
+            )
 
             key = get_key_at_point(layout, px, py)
             if key is None:

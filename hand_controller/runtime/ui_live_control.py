@@ -68,6 +68,10 @@ def _build_pointer_payload(keyboard_update: KeyboardUpdate) -> tuple[OverlayPoin
             x=pointer.x,
             y=pointer.y,
             hand_label="L" if pointer.hand_label == "Left" else "R" if pointer.hand_label == "Right" else pointer.hand_label,
+            thumb_x=pointer.thumb_x,
+            thumb_y=pointer.thumb_y,
+            index_x=pointer.index_x,
+            index_y=pointer.index_y,
         )
         for pointer in keyboard_update.pointers
     )
