@@ -8,3 +8,4 @@ __pycache__/
 tuning.local.json
 build/
 dist/
+release/installer/*.exe
