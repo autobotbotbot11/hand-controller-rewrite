@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt5.QtCore import QRect, QRectF, Qt, pyqtSlot
-from PyQt5.QtGui import QBrush, QColor, QFont, QImage, QPainter, QPainterPath, QPen
+from PyQt5.QtCore import QRect, Qt, pyqtSlot
+from PyQt5.QtGui import QBrush, QColor, QFont, QPainter, QPen
 from PyQt5.QtWidgets import QApplication, QWidget
 
 from ..config.settings import KeyboardConfig
@@ -47,7 +47,6 @@ class OverlayWindow(QWidget):
     def paintEvent(self, event) -> None:  # noqa: N802
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
-        self._draw_selfie(painter)
         if self.payload.keyboard_visible:
             self._draw_keyboard(painter)
         if self.settings.show_skeleton:
@@ -97,48 +96,6 @@ class OverlayWindow(QWidget):
                 painter.setPen(QColor(255, 255, 255, 230))
                 painter.drawText(pointer.x + radius + 3, pointer.y - max(4, radius // 2), pointer.hand_label)
 
-    def _selfie_target_rect(self) -> QRect:
-        margin = 20
-        x = margin
-        y = margin
-        if self.settings.selfie_position == "top_right":
-            x = self.width() - self.settings.selfie_width_px - margin
-        elif self.settings.selfie_position == "bottom_left":
-            y = self.height() - self.settings.selfie_height_px - margin
-        elif self.settings.selfie_position == "bottom_right":
-            x = self.width() - self.settings.selfie_width_px - margin
-            y = self.height() - self.settings.selfie_height_px - margin
-        return QRect(x, y, self.settings.selfie_width_px, self.settings.selfie_height_px)
-
-    def _draw_selfie_placeholder(self, painter: QPainter, target: QRect) -> None:
-        painter.save()
-        painter.setRenderHint(QPainter.Antialiasing)
-        painter.setPen(QPen(QColor(255, 255, 255, 235), 2))
-        painter.setBrush(Qt.NoBrush)
-
-        icon_w = min(72, max(40, target.width() // 3))
-        icon_h = int(icon_w * 0.7)
-        body = QRectF(
-            target.center().x() - icon_w / 2,
-            target.center().y() - icon_h / 2,
-            icon_w,
-            icon_h,
-        )
-        painter.drawRoundedRect(body, 8, 8)
-
-        lens_size = min(icon_h * 0.45, icon_w * 0.34)
-        lens = QRectF(
-            target.center().x() - lens_size / 2,
-            target.center().y() - lens_size / 2,
-            lens_size,
-            lens_size,
-        )
-        painter.drawEllipse(lens)
-
-        top = QRectF(body.left() + icon_w * 0.18, body.top() - 10, icon_w * 0.36, 10)
-        painter.drawRoundedRect(top, 5, 5)
-        painter.restore()
-
     def _draw_gesture_command(self, painter: QPainter) -> None:
         if not self.settings.show_gesture_command or not self.payload.gesture_command_text:
             return
@@ -165,36 +122,3 @@ class OverlayWindow(QWidget):
         painter.drawRoundedRect(rect, 14, 14)
         painter.setPen(QColor(255, 255, 255, 235))
         painter.drawText(rect, Qt.AlignCenter, text)
-
-    def _draw_selfie(self, painter: QPainter) -> None:
-        if not self.settings.show_selfie:
-            return
-        target = self._selfie_target_rect()
-
-        painter.save()
-        painter.setRenderHint(QPainter.Antialiasing)
-        panel_path = QPainterPath()
-        panel_path.addRoundedRect(QRectF(target), 18, 18)
-        painter.setPen(QPen(QColor(255, 255, 255, 75), 1))
-        painter.setBrush(QBrush(QColor(0, 0, 0, 230)))
-        painter.drawPath(panel_path)
-
-        frame = self.payload.selfie_frame
-        if frame is not None:
-            try:
-                import cv2
-            except ModuleNotFoundError:
-                frame = None
-
-        if frame is not None:
-            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            h, w, ch = rgb.shape
-            qimg = QImage(rgb.data, w, h, ch * w, QImage.Format_RGB888)
-            inset = target.adjusted(3, 3, -3, -3)
-            clip_path = QPainterPath()
-            clip_path.addRoundedRect(QRectF(inset), 15, 15)
-            painter.setClipPath(clip_path)
-            painter.drawImage(inset, qimg)
-        else:
-            self._draw_selfie_placeholder(painter, target)
-        painter.restore()

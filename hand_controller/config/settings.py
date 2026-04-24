@@ -94,6 +94,8 @@ class KeyboardConfig:
     show_pointers: bool = True
     show_selfie: bool = True
     selfie_position: str = "top_left"
+    selfie_custom_x_ratio: float | None = None
+    selfie_custom_y_ratio: float | None = None
     selfie_width_px: int = 320
     selfie_height_px: int = 240
     show_gesture_command: bool = True

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import math
 import sys
 import threading
@@ -33,6 +34,7 @@ from PyQt5.QtWidgets import (
 from ..config.settings import AppConfig, RUNTIME_APP_DIR, RUNTIME_BUNDLE_ROOT, build_factory_default_config
 from ..vision.camera import CameraSource, detect_available_cameras, probe_camera_index
 from .overlay_window import OverlayWindow
+from .selfie_window import SelfieWindow
 from .signals import OverlaySignalBus
 
 if sys.platform == "win32":
@@ -42,7 +44,13 @@ if sys.platform == "win32":
 WorkerFn = Callable[[OverlaySignalBus, threading.Event, AppConfig, int, int], None]
 
 PAGE_ORDER = ["GENERAL", "CAMERA", "DISPLAY", "KEYBOARD", "MOUSE"]
-SELFIE_POSITIONS = [("Top Left", "top_left"), ("Top Right", "top_right"), ("Bottom Left", "bottom_left"), ("Bottom Right", "bottom_right")]
+SELFIE_POSITIONS = [
+    ("Top Left", "top_left"),
+    ("Top Right", "top_right"),
+    ("Bottom Left", "bottom_left"),
+    ("Bottom Right", "bottom_right"),
+    ("Custom", "custom"),
+]
 GESTURE_COMMAND_POSITIONS = [("Top", "top"), ("Center", "center"), ("Bottom", "bottom")]
 HELP_TEXT = {
     "mouse_sensitivity": "Adjusts how strongly hand movement affects cursor movement.",
@@ -56,7 +64,7 @@ HELP_TEXT = {
     "show_hand_skeleton": "Shows or hides hand skeleton lines on the overlay.",
     "hand_skeleton_thickness": "Adjusts skeleton line thickness.",
     "show_live_selfie": "Shows or hides the live selfie preview on the overlay.",
-    "selfie_position": "Chooses where the selfie preview appears on screen.",
+    "selfie_position": "Chooses where the selfie preview appears on screen. Dragging the selfie sets a custom position.",
     "selfie_size": "Adjusts the size of the live selfie preview.",
     "show_gesture_command": "Shows or hides text feedback for recognized gestures.",
     "gesture_command_position": "Chooses where the gesture feedback text appears on screen.",
@@ -1022,6 +1030,7 @@ class MainWindow(QMainWindow):
         self.stop_button_label = stop_button_label
 
         self.overlay: OverlayWindow | None = None
+        self.selfie_window: SelfieWindow | None = None
         self.overlay_bus: OverlaySignalBus | None = None
         self.worker_thread: threading.Thread | None = None
         self.stop_event: threading.Event | None = None
@@ -1739,6 +1748,47 @@ class MainWindow(QMainWindow):
         self.working_config = replace(self.working_config, keyboard=replace(self.working_config.keyboard, **kwargs))
         self._push_live_overlay_settings()
 
+    def _persist_keyboard_fields(self, field_names: tuple[str, ...]) -> None:
+        tuning_path = Path(self.working_config.tuning_path) if self.working_config.tuning_path else RUNTIME_APP_DIR / "tuning.local.json"
+        try:
+            data = json.loads(tuning_path.read_text(encoding="utf-8")) if tuning_path.exists() else {}
+            if not isinstance(data, dict):
+                data = {}
+            keyboard_data = data.get("keyboard", {})
+            if not isinstance(keyboard_data, dict):
+                keyboard_data = {}
+            for field_name in field_names:
+                keyboard_data[field_name] = getattr(self.working_config.keyboard, field_name)
+            data["keyboard"] = keyboard_data
+            tuning_path.parent.mkdir(parents=True, exist_ok=True)
+            tuning_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        except Exception:
+            pass
+
+    @pyqtSlot(float, float)
+    def _selfie_position_dragged(self, x_ratio: float, y_ratio: float) -> None:
+        self._update_keyboard(
+            selfie_position="custom",
+            selfie_custom_x_ratio=float(x_ratio),
+            selfie_custom_y_ratio=float(y_ratio),
+        )
+        control = self.controls.get("selfie_position")
+        if isinstance(control, QComboBox):
+            self._block("selfie_position", True)
+            try:
+                idx = control.findData("custom")
+                if idx >= 0:
+                    control.setCurrentIndex(idx)
+            finally:
+                self._block("selfie_position", False)
+        self._persist_keyboard_fields(
+            (
+                "selfie_position",
+                "selfie_custom_x_ratio",
+                "selfie_custom_y_ratio",
+            )
+        )
+
     def _update_mouse_motion(self, **kwargs) -> None:
         self.working_config = replace(self.working_config, mouse_motion=replace(self.working_config.mouse_motion, **kwargs))
 
@@ -1863,6 +1913,13 @@ class MainWindow(QMainWindow):
             self.overlay.close()
             self.overlay = None
 
+    def _ensure_selfie_window(self, settings) -> None:
+        if self.selfie_window is None:
+            self.selfie_window = SelfieWindow(settings)
+            self.selfie_window.position_changed.connect(self._selfie_position_dragged)
+        else:
+            self.selfie_window.apply_settings(settings)
+
     def _start_launch_preflight(self, *, preferred_index: int) -> None:
         if self._launch_preflight_thread is not None and self._launch_preflight_thread.isRunning():
             return
@@ -1942,9 +1999,13 @@ class MainWindow(QMainWindow):
             self.overlay = OverlayWindow(launch_config.keyboard)
         else:
             self.overlay.apply_settings(launch_config.keyboard)
+        self._ensure_selfie_window(launch_config.keyboard)
         self.overlay_bus = OverlaySignalBus()
         self.overlay_bus.update_overlay.connect(self.overlay.apply_payload)
         self.overlay_bus.update_overlay_settings.connect(self.overlay.apply_settings)
+        if self.selfie_window is not None:
+            self.overlay_bus.update_overlay.connect(self.selfie_window.apply_payload)
+            self.overlay_bus.update_overlay_settings.connect(self.selfie_window.apply_settings)
         self.stop_event = threading.Event()
         self.worker_thread = threading.Thread(
             target=self.worker_fn,
@@ -1982,9 +2043,21 @@ class MainWindow(QMainWindow):
                 self.overlay_bus.update_overlay_settings.disconnect(self.overlay.apply_settings)
             except Exception:
                 pass
+        if self.overlay_bus is not None and self.selfie_window is not None:
+            try:
+                self.overlay_bus.update_overlay.disconnect(self.selfie_window.apply_payload)
+            except Exception:
+                pass
+            try:
+                self.overlay_bus.update_overlay_settings.disconnect(self.selfie_window.apply_settings)
+            except Exception:
+                pass
         if self.overlay is not None:
             self.overlay.close()
             self.overlay = None
+        if self.selfie_window is not None:
+            self.selfie_window.close()
+            self.selfie_window = None
         self.overlay_bus = None
         self.worker_thread = None
         self.stop_event = None
