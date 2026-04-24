@@ -34,6 +34,7 @@ from PyQt5.QtWidgets import (
 from ..config.settings import AppConfig, RUNTIME_APP_DIR, RUNTIME_BUNDLE_ROOT, build_factory_default_config
 from ..vision.camera import CameraSource, detect_available_cameras, probe_camera_index
 from .overlay_window import OverlayWindow
+from .quick_toolbar_window import QuickToolbarWindow
 from .selfie_window import SelfieWindow
 from .signals import OverlaySignalBus
 
@@ -1031,6 +1032,7 @@ class MainWindow(QMainWindow):
 
         self.overlay: OverlayWindow | None = None
         self.selfie_window: SelfieWindow | None = None
+        self.quick_toolbar: QuickToolbarWindow | None = None
         self.overlay_bus: OverlaySignalBus | None = None
         self.worker_thread: threading.Thread | None = None
         self.stop_event: threading.Event | None = None
@@ -1789,6 +1791,32 @@ class MainWindow(QMainWindow):
             )
         )
 
+    def _set_checked_control(self, key: str, checked: bool) -> None:
+        control = self.controls.get(key)
+        if not isinstance(control, QCheckBox):
+            return
+        self._block(key, True)
+        try:
+            control.setChecked(checked)
+        finally:
+            self._block(key, False)
+
+    @pyqtSlot(bool)
+    def _quick_toolbar_selfie_toggled(self, checked: bool) -> None:
+        self._update_keyboard(show_selfie=checked)
+        self._set_checked_control("show_live_selfie", checked)
+
+    @pyqtSlot(bool)
+    def _quick_toolbar_skeleton_toggled(self, checked: bool) -> None:
+        self._update_keyboard(show_skeleton=checked)
+        self._set_checked_control("show_hand_skeleton", checked)
+
+    @pyqtSlot()
+    def _show_from_quick_toolbar(self) -> None:
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
     def _update_mouse_motion(self, **kwargs) -> None:
         self.working_config = replace(self.working_config, mouse_motion=replace(self.working_config.mouse_motion, **kwargs))
 
@@ -1920,6 +1948,16 @@ class MainWindow(QMainWindow):
         else:
             self.selfie_window.apply_settings(settings)
 
+    def _ensure_quick_toolbar(self, settings) -> None:
+        if self.quick_toolbar is None:
+            self.quick_toolbar = QuickToolbarWindow(settings)
+            self.quick_toolbar.selfie_toggled.connect(self._quick_toolbar_selfie_toggled)
+            self.quick_toolbar.skeleton_toggled.connect(self._quick_toolbar_skeleton_toggled)
+            self.quick_toolbar.open_main_requested.connect(self._show_from_quick_toolbar)
+        else:
+            self.quick_toolbar.apply_settings(settings)
+            self.quick_toolbar.show()
+
     def _start_launch_preflight(self, *, preferred_index: int) -> None:
         if self._launch_preflight_thread is not None and self._launch_preflight_thread.isRunning():
             return
@@ -2000,12 +2038,15 @@ class MainWindow(QMainWindow):
         else:
             self.overlay.apply_settings(launch_config.keyboard)
         self._ensure_selfie_window(launch_config.keyboard)
+        self._ensure_quick_toolbar(launch_config.keyboard)
         self.overlay_bus = OverlaySignalBus()
         self.overlay_bus.update_overlay.connect(self.overlay.apply_payload)
         self.overlay_bus.update_overlay_settings.connect(self.overlay.apply_settings)
         if self.selfie_window is not None:
             self.overlay_bus.update_overlay.connect(self.selfie_window.apply_payload)
             self.overlay_bus.update_overlay_settings.connect(self.selfie_window.apply_settings)
+        if self.quick_toolbar is not None:
+            self.overlay_bus.update_overlay_settings.connect(self.quick_toolbar.apply_settings)
         self.stop_event = threading.Event()
         self.worker_thread = threading.Thread(
             target=self.worker_fn,
@@ -2052,12 +2093,20 @@ class MainWindow(QMainWindow):
                 self.overlay_bus.update_overlay_settings.disconnect(self.selfie_window.apply_settings)
             except Exception:
                 pass
+        if self.overlay_bus is not None and self.quick_toolbar is not None:
+            try:
+                self.overlay_bus.update_overlay_settings.disconnect(self.quick_toolbar.apply_settings)
+            except Exception:
+                pass
         if self.overlay is not None:
             self.overlay.close()
             self.overlay = None
         if self.selfie_window is not None:
             self.selfie_window.close()
             self.selfie_window = None
+        if self.quick_toolbar is not None:
+            self.quick_toolbar.close()
+            self.quick_toolbar = None
         self.overlay_bus = None
         self.worker_thread = None
         self.stop_event = None
