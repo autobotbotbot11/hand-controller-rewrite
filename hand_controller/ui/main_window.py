@@ -1861,6 +1861,19 @@ class MainWindow(QMainWindow):
         self._update_keyboard(show_skeleton=checked)
         self._set_checked_control("show_hand_skeleton", checked)
 
+    @pyqtSlot(str, float)
+    def _quick_toolbar_position_changed(self, edge: str, offset_ratio: float) -> None:
+        self._update_keyboard(
+            quick_toolbar_edge=str(edge),
+            quick_toolbar_offset_ratio=float(offset_ratio),
+        )
+        self._persist_keyboard_fields(
+            (
+                "quick_toolbar_edge",
+                "quick_toolbar_offset_ratio",
+            )
+        )
+
     @pyqtSlot()
     def _show_from_quick_toolbar(self) -> None:
         self.showNormal()
@@ -2005,6 +2018,7 @@ class MainWindow(QMainWindow):
             self.quick_toolbar = QuickToolbarWindow(settings)
             self.quick_toolbar.selfie_toggled.connect(self._quick_toolbar_selfie_toggled)
             self.quick_toolbar.skeleton_toggled.connect(self._quick_toolbar_skeleton_toggled)
+            self.quick_toolbar.position_changed.connect(self._quick_toolbar_position_changed)
             self.quick_toolbar.open_main_requested.connect(self._show_from_quick_toolbar)
         else:
             self.quick_toolbar.apply_settings(settings)

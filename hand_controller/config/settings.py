@@ -113,6 +113,8 @@ class KeyboardConfig:
     key_hover_border_px: int = 3
     status_panel_max_width_px: int = 880
     status_line_height_px: int = 22
+    quick_toolbar_edge: str = "right"
+    quick_toolbar_offset_ratio: float = 0.5
     layout_rows: tuple[tuple[str, ...], ...] = field(
         default_factory=lambda: (
             ("ESC", "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"),

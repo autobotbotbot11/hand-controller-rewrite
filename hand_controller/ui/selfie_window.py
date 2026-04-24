@@ -60,10 +60,14 @@ class SelfieWindow(QWidget):
             max(min_y, min(point.y(), max_y)),
         )
 
+    def _target_size_from_settings(self) -> tuple[int, int]:
+        width = max(self.MIN_WIDTH, min(self.MAX_WIDTH, int(self.settings.selfie_width_px)))
+        height = int(round(width / self.ASPECT_RATIO))
+        return width, height
+
     def _corner_top_left(self, available: QRect) -> QPoint:
         margin = 20
-        width = self.settings.selfie_width_px
-        height = self.settings.selfie_height_px
+        width, height = self._target_size_from_settings()
         x = available.left() + margin
         y = available.top() + margin
         if self.settings.selfie_position == "top_right":
@@ -81,8 +85,9 @@ class SelfieWindow(QWidget):
         if self.settings.selfie_custom_x_ratio is None or self.settings.selfie_custom_y_ratio is None:
             return None
 
-        max_x = max(0, available.width() - self.settings.selfie_width_px)
-        max_y = max(0, available.height() - self.settings.selfie_height_px)
+        width, height = self._target_size_from_settings()
+        max_x = max(0, available.width() - width)
+        max_y = max(0, available.height() - height)
         x_ratio = max(0.0, min(1.0, float(self.settings.selfie_custom_x_ratio)))
         y_ratio = max(0.0, min(1.0, float(self.settings.selfie_custom_y_ratio)))
         return QPoint(
@@ -91,12 +96,8 @@ class SelfieWindow(QWidget):
         )
 
     def _apply_geometry_from_settings(self) -> None:
-        width = max(self.MIN_WIDTH, min(self.MAX_WIDTH, int(self.settings.selfie_width_px)))
-        height = int(round(width / self.ASPECT_RATIO))
-        self.resize(
-            width,
-            height,
-        )
+        width, height = self._target_size_from_settings()
+        self.resize(width, height)
         available = self._available_geometry()
         top_left = self._custom_top_left(available) or self._corner_top_left(available)
         self.move(self._clamped_top_left(top_left))
